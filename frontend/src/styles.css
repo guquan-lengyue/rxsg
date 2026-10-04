@@ -55,6 +55,7 @@ body {
 
 /* 关闭小按钮：lottery_close 三态。 */
 .u-close {
+  flex: 0 0 auto;
   width: 26px;
   height: 26px;
   padding: 0;

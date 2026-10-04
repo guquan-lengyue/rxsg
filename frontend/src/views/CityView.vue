@@ -553,10 +553,14 @@ select {
   border-radius: 4px;
 }
 
-/* 顶栏模块按钮：原版 topbutton 贴图（军事/武将 自带文字） */
+/* 顶栏模块按钮：原版 topbutton 贴图（军事/武将 自带文字）。
+   源图 topbutton_*.png 均为 61×26，显式定宽高以保持贴图不被压扁，
+   且避免空内容导致宽度塌缩为 12px 竖条。 */
 .nav-btn {
-  height: 30px;
-  padding: 0 6px;
+  width: 61px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 0;
   border: none;
   background: center / 100% 100% no-repeat;
 }

@@ -26,9 +26,23 @@ export function soldierBig(sid: number): string {
   return img(`army_${sid}_big.png`)
 }
 
-/** 建筑介绍小图（内政面板用）：images/building_intro_{bid}.png。 */
+/** 建筑贴图：按 bid 映射到原版建筑贴图（inbuilding_/outbuilding_/building_）。
+    rxsg_test 的 cfg_buildings 仅含 1-10 号核心建筑，其编号与 building_intro_N 并不一一对应；
+    故改用语义明确的原版建筑贴图。未知 bid 回退到 building_intro_{bid}。 */
+const BUILDING_TEXTURES: Record<number, string> = {
+  1: 'building_cityhall.png', // 官府
+  2: 'outbuilding_farm.png', // 农田
+  3: 'outbuilding_logcamp.png', // 伐木场
+  4: 'outbuilding_stonepit.png', // 采石场
+  5: 'outbuilding_mine.png', // 铁矿
+  6: 'inbuilding_house.png', // 民居
+  7: 'inbuilding_institute.png', // 书院
+  8: 'inbuilding_barrack.png', // 兵营
+  9: 'inbuilding_barn.png', // 仓库（谷仓）
+  10: 'inbuilding_forceyard.png', // 校场
+}
 export function buildingIntro(bid: number): string {
-  return img(`building_intro_${bid}.png`)
+  return img(BUILDING_TEXTURES[bid] ?? `building_intro_${bid}.png`)
 }
 
 /** 装备图标：images/armor/{id}.png。 */
