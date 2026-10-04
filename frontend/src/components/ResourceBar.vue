@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import { zhCN } from '@/lang/zh-CN'
+import { resIcon } from '@/assets/img'
 import type { CityResource } from '@/types'
 
 const props = defineProps<{ resource: CityResource | null }>()
@@ -26,6 +27,7 @@ const items = computed(() => {
 <template>
   <div class="resource-bar">
     <div v-for="item in items" :key="item.key" class="resource-item">
+      <img class="ricon" :src="resIcon(item.key)" :alt="item.label" />
       <span class="label">{{ item.label }}</span>
       <span class="value">{{ item.value }}<small v-if="item.max"> / {{ item.max }}</small></span>
     </div>
@@ -45,8 +47,14 @@ const items = computed(() => {
 
 .resource-item {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
+}
+
+.ricon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
 }
 
 .resource-item .label {

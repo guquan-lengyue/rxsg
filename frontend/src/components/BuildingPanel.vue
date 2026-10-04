@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import { formatLeft } from '@/render/cityGrid'
+import { buildingIntro } from '@/assets/img'
 import { zhCN } from '@/lang/zh-CN'
 import type { BuildingDetail } from '@/types'
 
@@ -44,6 +45,7 @@ const timeText = computed(() => (next.value ? formatLeft(next.value.upgradeTime)
     <p v-else-if="error" class="hint error">{{ error }}</p>
 
     <template v-else-if="detail">
+      <img class="building" :src="buildingIntro(detail.bid)" :alt="detail.name" />
       <div class="row">
         <span class="label">等级</span>
         <span>{{ detail.level }}</span>
@@ -137,6 +139,16 @@ const timeText = computed(() => (next.value ? formatLeft(next.value.upgradeTime)
 
 .countdown {
   color: var(--accent);
+}
+
+.building {
+  width: 100%;
+  height: auto;
+  max-height: 120px;
+  object-fit: contain;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--bg);
 }
 
 .costs {

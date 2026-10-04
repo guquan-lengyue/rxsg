@@ -18,8 +18,8 @@ function walk(dir) {
   }
   return out
 }
-const existing = new Set(walk(PUBDIR).map((p) => normalize(p).replace(/\\/g, '/').replace(/^[^:]+:\/|^\/+/, '')))
 const relToImgs = (f) => normalize(f).replace(/\\/g, '/').replace(/.*\/public\/images\//, '')
+const existing = new Set(walk(PUBDIR).map(relToImgs))
 
 // 2) 扫描 src 下所有文件文本。
 function scanSrc() {

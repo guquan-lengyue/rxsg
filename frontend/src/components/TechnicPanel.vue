@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import { zhCN } from '@/lang/zh-CN'
 import { formatLeft } from '@/render/cityGrid'
+import { techIcon } from '@/assets/img'
 import type { TechnicInfo, TechnicState } from '@/types'
 
 const props = defineProps<{
@@ -50,7 +51,10 @@ function costs(t: TechnicState): { key: string; label: string; value: number }[]
         <ul class="tech-list">
           <li v-for="t in list" :key="t.tid" class="tech">
             <div class="tech-head">
-              <strong>{{ t.tname }}</strong>
+              <span class="tech-title">
+                <img class="ticon" :src="techIcon(t.tid)" :alt="t.tname" />
+                <strong>{{ t.tname }}</strong>
+              </span>
               <span class="lv">
                 Lv{{ t.level }}
                 <span v-if="t.sharelevel" class="share">
@@ -181,8 +185,23 @@ function costs(t: TechnicState): { key: string; label: string; value: number }[]
   justify-content: space-between;
 }
 
+.tech-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .tech-head strong {
   color: var(--text);
+}
+
+.ticon {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: var(--panel);
 }
 
 .lv {

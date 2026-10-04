@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { loginAnnouncement } from '@/api/auth'
 import { errorMessage } from '@/api/http'
+import { img } from '@/assets/img'
 import { zhCN } from '@/lang/zh-CN'
 import { useAuthStore } from '@/stores/auth'
 
@@ -62,7 +63,7 @@ async function onSubmit(): Promise<void> {
 <template>
   <div class="login-page">
     <form class="login-card" @submit.prevent="onSubmit">
-      <h1>{{ zhCN.appTitle }}</h1>
+      <img class="logo" :src="img('title.png')" :alt="zhCN.appTitle" />
       <p class="subtitle">{{ zhCN.login.title }}</p>
 
       <label class="field">
@@ -100,21 +101,26 @@ async function onSubmit(): Promise<void> {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  background: url('/images/bj.jpg') center / cover no-repeat;
 }
 
 .login-card {
-  width: 340px;
-  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  padding: 28px 30px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border-radius: 4px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
 }
 
-h1 {
-  margin: 0;
-  color: var(--accent);
-  font-size: 24px;
-  text-align: center;
+.logo {
+  align-self: center;
+  width: auto;
+  height: 46px;
+  margin-bottom: 6px;
+  object-fit: contain;
 }
 
 .subtitle {

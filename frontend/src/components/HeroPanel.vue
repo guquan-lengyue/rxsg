@@ -3,6 +3,7 @@ import { computed, reactive } from 'vue'
 
 import { zhCN } from '@/lang/zh-CN'
 import { formatLeft } from '@/render/cityGrid'
+import { heroFace } from '@/assets/img'
 import type { HeroInfo, HeroState } from '@/types'
 
 const props = defineProps<{
@@ -67,29 +68,34 @@ function onStartExpr(h: HeroState): void {
       <ul v-else class="list">
         <li v-for="h in heroes" :key="h.hid" class="item">
           <div class="row">
-            <strong>{{ h.name }}</strong>
-            <span class="state">
-              Lv{{ h.level }} · {{ stateText(h.state) }}
-              <span v-if="h.expr"> · {{ zhCN.hero.expring }}</span>
-            </span>
-          </div>
+            <img class="face" :src="heroFace(h.sex, h.face)" :alt="h.name" />
+            <div class="head-main">
+              <div class="row">
+                <strong>{{ h.name }}</strong>
+                <span class="state">
+                  Lv{{ h.level }} · {{ stateText(h.state) }}
+                  <span v-if="h.expr"> · {{ zhCN.hero.expring }}</span>
+                </span>
+              </div>
 
-          <div class="row dim small">
-            <span>
-              {{ zhCN.hero.exp }} {{ progressOf(h) }}
-              <span v-if="!h.can_upgrade && h.no_upgrade_msg === '经验不足'">
-                （{{ zhCN.hero.needExp }} {{ h.need_exp }}）
-              </span>
-            </span>
-            <span>{{ zhCN.hero.loyalty }} {{ h.loyalty }}</span>
-          </div>
+              <div class="row dim small">
+                <span>
+                  {{ zhCN.hero.exp }} {{ progressOf(h) }}
+                  <span v-if="!h.can_upgrade && h.no_upgrade_msg === '经验不足'">
+                    （{{ zhCN.hero.needExp }} {{ h.need_exp }}）
+                  </span>
+                </span>
+                <span>{{ zhCN.hero.loyalty }} {{ h.loyalty }}</span>
+              </div>
 
-          <div class="row dim small">
-            <span>
-              统{{ h.command_base + 0 }} 武{{ h.bravery_base + h.bravery_add }}
-              智{{ h.wisdom_base + h.wisdom_add }} 政{{ h.affairs_base + h.affairs_add }}
-            </span>
-            <span>攻{{ h.attack_base + h.attack_add_on }} 防{{ h.defence_base + h.defence_add_on }}</span>
+              <div class="row dim small">
+                <span>
+                  统{{ h.command_base + 0 }} 武{{ h.bravery_base + h.bravery_add }}
+                  智{{ h.wisdom_base + h.wisdom_add }} 政{{ h.affairs_base + h.affairs_add }}
+                </span>
+                <span>攻{{ h.attack_base + h.attack_add_on }} 防{{ h.defence_base + h.defence_add_on }}</span>
+              </div>
+            </div>
           </div>
 
           <!-- 历练进行中：显示倒计时与取消 -->
@@ -212,6 +218,23 @@ function onStartExpr(h: HeroState): void {
   justify-content: space-between;
   gap: 8px;
   font-size: 13px;
+}
+
+.face {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 60px;
+  object-fit: cover;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.head-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .dim {

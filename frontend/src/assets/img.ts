@@ -9,10 +9,11 @@ export function img(rel: string): string {
   return rel.replace(/^\/+/, '') ? `${IMAGES_BASE}/${rel.replace(/^\/+/, '')}` : IMAGES_BASE
 }
 
-/** 武将头像：images/hero/hero_{sex}_{face}.jpg（sex: 1=男 2=女，与原版 trade 拼接一致）。 */
+/** 武将头像：images/hero/hero_{sex}_{face}.jpg（sex: 1=男 2=女）。face<=0 为未设置占位，回退到 1。 */
 export function heroFace(sex: number, face: number): string {
   const gender = sex === 2 ? 'girl' : 'boy'
-  return img(`hero/hero_${gender}_${face}.jpg`)
+  const fid = face > 0 ? face : 1
+  return img(`hero/hero_${gender}_${fid}.jpg`)
 }
 
 /** 兵种图标：images/army_{sid}.png。 */
@@ -38,6 +39,25 @@ export function armor(id: number): string {
 /** 地形图：images/view_terrain_{id}.png。 */
 export function terrain(id: number | string): string {
   return img(`view_terrain_${id}.png`)
+}
+
+/** 科技图标：images/tech_{tid}.png（tid 1..29）。 */
+export function techIcon(tid: number): string {
+  return img(`tech_${tid}.png`)
+}
+
+/** 资源图标：粮/木/石/铁用 images/resource_*.png；金银与人口用替代图。 */
+export function resIcon(key: string): string {
+  const map: Record<string, string> = {
+    wood: 'resource_wood.png',
+    rock: 'resource_rock.png',
+    iron: 'resource_iron.png',
+    food: 'resource_food.png',
+    gold: 'city_gold.png',
+    people: 'city_population.png',
+    morale: 'city_popularity.png',
+  }
+  return img(map[key] ?? 'resource_wood.png')
 }
 
 /** 预取一组图片，先把像素/缓存加载好再绘制，避免闪烁。 */

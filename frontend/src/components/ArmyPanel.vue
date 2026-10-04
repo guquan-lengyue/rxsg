@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue'
 
 import { zhCN } from '@/lang/zh-CN'
 import { formatLeft } from '@/render/cityGrid'
+import { soldierIcon } from '@/assets/img'
 import type { ArmyInfo, DispatchPayload, Field, Hero, March } from '@/types'
 
 const props = defineProps<{
@@ -144,7 +145,10 @@ function onDispatch(): void {
           <ul class="list">
             <li v-for="s in soldiers" :key="s.sid" class="item">
               <div class="row">
-                <strong>{{ s.sname }}</strong>
+                <span class="sname">
+                  <img class="soldier" :src="soldierIcon(s.sid)" :alt="s.sname" />
+                  <strong>{{ s.sname }}</strong>
+                </span>
                 <span class="dim">{{ zhCN.army.owned }} {{ s.count }}</span>
               </div>
               <div class="row dim small">
@@ -399,6 +403,21 @@ function onDispatch(): void {
   justify-content: space-between;
   gap: 8px;
   font-size: 13px;
+}
+
+.sname {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.soldier {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: var(--panel);
 }
 
 .dim {
