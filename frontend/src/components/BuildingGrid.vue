@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-import { drawCityGrid } from '@/render/cityGrid'
+import { buildingAt, CELL_SIZE, drawCityGrid } from '@/render/cityGrid'
 import type { Building } from '@/types'
 
-const props = defineProps<{ buildings: Building[] }>()
+const props = defineProps<{ buildings: Building[]; selected?: Building | null }>()
+const emit = defineEmits<{ (e: 'select', b: Building): void }>()
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 let timer: number | null = null
@@ -12,6 +13,17 @@ let timer: number | null = null
 function render(): void {
   if (canvas.value) {
     drawCityGrid(canvas.value, props.buildings)
+  }
+}
+
+function onClick(event: MouseEvent): void {
+  const el = canvas.value
+  if (!el) {
+    return
+  }
+  const hit = buildingAt(props.buildings, event.offsetX, event.offsetY, CELL_SIZE)
+  if (hit) {
+    emit('select', hit)
   }
 }
 
@@ -32,7 +44,7 @@ watch(() => props.buildings, render, { flush: 'post' })
 
 <template>
   <div class="grid-wrap">
-    <canvas v-if="buildings.length" ref="canvas" />
+    <canvas v-if="buildings.length" ref="canvas" @click="onClick" />
     <p v-else class="empty">暂无建筑数据</p>
   </div>
 </template>
@@ -48,6 +60,7 @@ watch(() => props.buildings, render, { flush: 'post' })
 
 .grid-wrap canvas {
   display: block;
+  cursor: pointer;
 }
 
 .empty {

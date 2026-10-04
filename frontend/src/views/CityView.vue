@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import BuildingGrid from '@/components/BuildingGrid.vue'
+import BuildingPanel from '@/components/BuildingPanel.vue'
 import ResourceBar from '@/components/ResourceBar.vue'
 import { errorMessage } from '@/api/http'
 import { zhCN } from '@/lang/zh-CN'
 import { useAuthStore } from '@/stores/auth'
 import { useCityStore } from '@/stores/city'
+import type { Building, BuildingDetail } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +19,83 @@ const city = useCityStore()
 const loading = ref(false)
 const error = ref('')
 const activeCid = ref(0)
+
+// 建筑面板状态
+const selected = ref<Building | null>(null)
+const buildingDetail = ref<BuildingDetail | null>(null)
+const panelLoading = ref(false)
+const panelError = ref('')
+const busy = ref(false)
+
+async function selectBuilding(b: Building): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  selected.value = b
+  buildingDetail.value = null
+  panelError.value = ''
+  panelLoading.value = true
+  try {
+    buildingDetail.value = await city.loadBuildingDetail(activeCid.value, b.bid, b.x, b.y)
+  } catch (e) {
+    panelError.value = errorMessage(e)
+  } finally {
+    panelLoading.value = false
+  }
+}
+
+async function refreshSelectedDetail(): Promise<void> {
+  const b = selected.value
+  if (!b || !activeCid.value || busy.value) {
+    return
+  }
+  try {
+    buildingDetail.value = await city.loadBuildingDetail(activeCid.value, b.bid, b.x, b.y)
+  } catch (e) {
+    panelError.value = errorMessage(e)
+  }
+}
+
+async function onUpgrade(): Promise<void> {
+  const b = selected.value
+  if (!b || !activeCid.value) {
+    return
+  }
+  busy.value = true
+  panelError.value = ''
+  try {
+    buildingDetail.value = await city.upgradeBuilding(activeCid.value, b.bid, b.x, b.y)
+  } catch (e) {
+    panelError.value = errorMessage(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onStop(): Promise<void> {
+  const b = selected.value
+  if (!b || !activeCid.value) {
+    return
+  }
+  busy.value = true
+  panelError.value = ''
+  try {
+    buildingDetail.value = await city.stopBuilding(activeCid.value, b.bid, b.x, b.y)
+  } catch (e) {
+    panelError.value = errorMessage(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+function closePanel(): void {
+  selected.value = null
+  buildingDetail.value = null
+  panelError.value = ''
+}
+
+// 心跳刷新建筑列表后，同步刷新已选建筑详情（用于展示升级完成后的等级）。
+watch(() => city.buildings, refreshSelectedDetail, { deep: false })
 
 const title = computed(() => city.currentCity?.name || '—')
 
@@ -30,6 +109,7 @@ function parseCid(): number {
 async function enterCity(cid: number): Promise<void> {
   loading.value = true
   error.value = ''
+  closePanel()
   try {
     if (!city.cities.length) {
       await city.loadCities()
@@ -103,7 +183,23 @@ onBeforeUnmount(() => {
 
       <template v-if="!loading && !error">
         <ResourceBar :resource="city.resources" />
-        <BuildingGrid :buildings="city.buildings" />
+        <div class="city-body">
+          <BuildingGrid
+            :buildings="city.buildings"
+            :selected="selected"
+            @select="selectBuilding"
+          />
+          <BuildingPanel
+            v-if="selected"
+            :detail="buildingDetail"
+            :loading="panelLoading"
+            :error="panelError"
+            :busy="busy"
+            @upgrade="onUpgrade"
+            @stop="onStop"
+            @close="closePanel"
+          />
+        </div>
       </template>
     </main>
   </div>
@@ -171,6 +267,17 @@ select {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.city-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.city-body > :first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .hint {

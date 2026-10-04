@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"rxsg/backend/internal/auth"
+	"rxsg/backend/internal/building"
 	"rxsg/backend/internal/city"
 	"rxsg/backend/internal/config"
 	"rxsg/backend/internal/db"
@@ -33,7 +34,9 @@ func main() {
 	sessionStore := auth.NewSessionStore()
 	authSvc := auth.NewService(database, jwtMgr, sessionStore)
 	authHandler := auth.NewHandler(authSvc)
-	cityHandler := city.NewHandler(city.NewService(database))
+	buildingSvc := building.NewService(database)
+	buildingHandler := building.NewHandler(buildingSvc)
+	cityHandler := city.NewHandler(city.NewService(database, buildingSvc))
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -52,6 +55,7 @@ func main() {
 	protected.Use(middleware.RequireAuth(jwtMgr, sessionStore))
 	authHandler.RegisterProtected(protected)
 	cityHandler.Register(protected)
+	buildingHandler.Register(protected)
 
 	addr := ":" + strconv.Itoa(cfg.Server.Port)
 	log.Printf("rxsg backend 启动于 %s", addr)

@@ -72,6 +72,36 @@ export interface Building {
   using_people: number
 }
 
+// 单个建筑的下一级升级信息（对齐后端 building.UpgradeInfo）。
+export interface UpgradeInfo {
+  bid: number
+  name: string
+  level: number
+  level_description: string
+  woodNeed: number
+  rockNeed: number
+  ironNeed: number
+  foodNeed: number
+  goldNeed: number
+  peopleNeed: number
+  upgradeTime: number
+  canUpgrade: boolean
+  no_upgrade_msg: string
+}
+
+// 单建筑详情（对齐后端 building.Detail）。
+export interface BuildingDetail {
+  bid: number
+  name: string
+  x: number
+  y: number
+  level: number
+  state: number
+  state_endtime: number
+  state_timeleft: number
+  next: UpgradeInfo | null
+}
+
 export interface Technic {
   tid: number
   level: number

@@ -4,16 +4,18 @@ import (
 	"context"
 	"database/sql"
 
+	"rxsg/backend/internal/building"
 	"rxsg/backend/internal/db"
 	"rxsg/backend/internal/httpx"
 	"rxsg/backend/internal/model"
 )
 
 type Service struct {
-	db *db.DB
+	db  *db.DB
+	bld *building.Service
 }
 
-func NewService(d *db.DB) *Service { return &Service{db: d} }
+func NewService(d *db.DB, bld *building.Service) *Service { return &Service{db: d, bld: bld} }
 
 // CityDetail 对齐 doGetCityAllInfo（utils.php:846）的返回顺序：
 // [城市, 基础信息, 建筑, 科技, 州郡]。
@@ -152,25 +154,9 @@ func (s *Service) heroCurCID(ctx context.Context, h model.Hero) int {
 	return int(target)
 }
 
-// Buildings 对齐 getCityBuildingInfo（utils.php:776-792）。
+// Buildings 委托 building.Service：含惰性结算与联表建筑名。
 func (s *Service) Buildings(ctx context.Context, cid int) ([]model.Building, error) {
-	rows, err := s.db.FetchRows(ctx,
-		"select b.*, c.name as bname from buildings b left join cfg_buildings c on c.bid=b.building_id where b.city_id=?",
-		cid)
-	if err != nil {
-		return nil, err
-	}
-	now, err := s.db.Now(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]model.Building, 0, len(rows))
-	for _, r := range rows {
-		b := model.BuildingFromMap(r)
-		b.StateTimeLeft = b.StateEndTime - now
-		out = append(out, b)
-	}
-	return out, nil
+	return s.bld.List(ctx, cid)
 }
 
 // Technics 对齐 utils.php:859。

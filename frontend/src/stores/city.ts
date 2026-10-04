@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import * as cityApi from '@/api/city'
-import type { Building, City, CityDetail, CityResource } from '@/types'
+import type { Building, BuildingDetail, City, CityDetail, CityResource } from '@/types'
 
 // 心跳间隔对齐 legacy getCityBaseInfo 的 10s 节奏。
 const HEARTBEAT_MS = 10000
@@ -34,10 +34,48 @@ export const useCityStore = defineStore('city', () => {
     resources.value = await cityApi.getResources(cid)
   }
 
+  async function refreshBuildings(cid: number): Promise<void> {
+    buildings.value = await cityApi.getBuildings(cid)
+  }
+
+  async function loadBuildingDetail(
+    cid: number,
+    bid: number,
+    x: number,
+    y: number,
+  ): Promise<BuildingDetail> {
+    return cityApi.getBuildingDetail(cid, bid, x, y)
+  }
+
+  // 升级/停止后后端返回最新建筑列表，同时刷新资源与详情。
+  async function upgradeBuilding(
+    cid: number,
+    bid: number,
+    x: number,
+    y: number,
+  ): Promise<BuildingDetail> {
+    buildings.value = await cityApi.upgradeBuilding(cid, bid, x, y)
+    resources.value = await cityApi.getResources(cid)
+    return cityApi.getBuildingDetail(cid, bid, x, y)
+  }
+
+  async function stopBuilding(
+    cid: number,
+    bid: number,
+    x: number,
+    y: number,
+  ): Promise<BuildingDetail> {
+    buildings.value = await cityApi.stopBuilding(cid, bid, x, y)
+    resources.value = await cityApi.getResources(cid)
+    return cityApi.getBuildingDetail(cid, bid, x, y)
+  }
+
   function startHeartbeat(cid: number): void {
     stopHeartbeat()
     timer = setInterval(() => {
       void refreshResources(cid)
+      // 建筑/科技等到期结算由后端惰性触发，心跳带上建筑列表以刷新等级与状态。
+      void refreshBuildings(cid)
     }, HEARTBEAT_MS)
   }
 
@@ -57,6 +95,10 @@ export const useCityStore = defineStore('city', () => {
     loadCities,
     loadCity,
     refreshResources,
+    refreshBuildings,
+    loadBuildingDetail,
+    upgradeBuilding,
+    stopBuilding,
     startHeartbeat,
     stopHeartbeat,
   }

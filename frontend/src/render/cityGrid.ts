@@ -6,6 +6,9 @@ export interface RenderOptions {
   now?: number
 }
 
+// 单格像素尺寸，BuildingGrid 点击命中测试与绘制保持一致。
+export const CELL_SIZE = 56
+
 const COLORS = {
   grid: '#2b3a4a',
   idle: '#3a5a7a',
@@ -27,7 +30,7 @@ export function drawCityGrid(
     return
   }
 
-  const cell = options.cellSize ?? 56
+  const cell = options.cellSize ?? CELL_SIZE
   const now = options.now ?? Math.floor(Date.now() / 1000)
 
   const maxX = buildings.reduce((m, b) => Math.max(m, b.x), 0)
@@ -64,7 +67,7 @@ export function drawCityGrid(
   for (const b of buildings) {
     const px = b.x * cell
     const py = b.y * cell
-    const upgrading = b.state_timeleft > 0
+    const upgrading = b.state === 1 || b.state_timeleft > 0
 
     ctx.fillStyle = upgrading ? COLORS.upgrading : b.level > 0 ? COLORS.built : COLORS.idle
     ctx.fillRect(px + 4, py + 4, cell - 8, cell - 8)
@@ -86,6 +89,18 @@ export function drawCityGrid(
       ctx.fillText(formatLeft(b.state_endtime - now), px + cell / 2, py + cell - 8)
     }
   }
+}
+
+// 命中测试：把画布内的像素坐标换算为格子并返回该格建筑。
+export function buildingAt(
+  buildings: Building[],
+  px: number,
+  py: number,
+  cell: number = CELL_SIZE,
+): Building | undefined {
+  const x = Math.floor(px / cell)
+  const y = Math.floor(py / cell)
+  return buildings.find((b) => b.x === x && b.y === y)
 }
 
 // 把剩余秒数格式化为 mm:ss / hh:mm:ss

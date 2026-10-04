@@ -3,6 +3,7 @@ import http from './http'
 import type {
   Alarm,
   Building,
+  BuildingDetail,
   City,
   CityDefence,
   CityDetail,
@@ -29,6 +30,38 @@ export async function getResources(cid: number): Promise<CityResource> {
 
 export async function getBuildings(cid: number): Promise<Building[]> {
   const { data } = await http.get<Building[]>(`/cities/${cid}/buildings`)
+  return data
+}
+
+export async function getBuildingDetail(
+  cid: number,
+  bid: number,
+  x: number,
+  y: number,
+): Promise<BuildingDetail> {
+  const { data } = await http.get<BuildingDetail>(`/cities/${cid}/buildings/info`, {
+    params: { bid, x, y },
+  })
+  return data
+}
+
+export async function upgradeBuilding(
+  cid: number,
+  bid: number,
+  x: number,
+  y: number,
+): Promise<Building[]> {
+  const { data } = await http.post<Building[]>(`/cities/${cid}/buildings/upgrade`, { bid, x, y })
+  return data
+}
+
+export async function stopBuilding(
+  cid: number,
+  bid: number,
+  x: number,
+  y: number,
+): Promise<Building[]> {
+  const { data } = await http.post<Building[]>(`/cities/${cid}/buildings/stop`, { bid, x, y })
   return data
 }
 
