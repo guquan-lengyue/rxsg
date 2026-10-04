@@ -107,6 +107,34 @@ export interface Technic {
   level: number
 }
 
+// 单个科技的完整状态（对齐后端 technic.Item，字段沿用 legacy TechnicState 命名）。
+export interface TechnicState {
+  tid: number
+  tname: string
+  cid: number
+  description: string
+  level: number
+  sharelevel: number
+  state: number
+  state_endtime: number
+  state_timeleft: number
+  can_upgrade: boolean
+  no_upgrade_msg: string
+  levelDescription: string
+  nextLevelDescription: string
+  woodNeed: number
+  rockNeed: number
+  ironNeed: number
+  foodNeed: number
+  goldNeed: number
+  upgrade_time: number
+}
+
+export interface TechnicInfo {
+  technics: TechnicState[]
+  collegeCount: number
+}
+
 export interface CitySoldier {
   cid: number
   sid: number

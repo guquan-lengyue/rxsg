@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import BuildingGrid from '@/components/BuildingGrid.vue'
 import BuildingPanel from '@/components/BuildingPanel.vue'
 import ResourceBar from '@/components/ResourceBar.vue'
+import TechnicPanel from '@/components/TechnicPanel.vue'
 import { errorMessage } from '@/api/http'
 import { zhCN } from '@/lang/zh-CN'
 import { useAuthStore } from '@/stores/auth'
@@ -26,6 +27,64 @@ const buildingDetail = ref<BuildingDetail | null>(null)
 const panelLoading = ref(false)
 const panelError = ref('')
 const busy = ref(false)
+
+// 科技面板状态
+const showTechnics = ref(false)
+const technicLoading = ref(false)
+const technicError = ref('')
+const busyTid = ref(0)
+
+async function openTechnics(): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  showTechnics.value = true
+  technicError.value = ''
+  technicLoading.value = true
+  try {
+    await city.loadTechnicInfo(activeCid.value)
+  } catch (e) {
+    technicError.value = errorMessage(e)
+  } finally {
+    technicLoading.value = false
+  }
+}
+
+function closeTechnics(): void {
+  showTechnics.value = false
+  technicError.value = ''
+  busyTid.value = 0
+}
+
+async function onTechnicUpgrade(tid: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  busyTid.value = tid
+  technicError.value = ''
+  try {
+    await city.upgradeTechnic(activeCid.value, tid)
+  } catch (e) {
+    technicError.value = errorMessage(e)
+  } finally {
+    busyTid.value = 0
+  }
+}
+
+async function onTechnicStop(tid: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  busyTid.value = tid
+  technicError.value = ''
+  try {
+    await city.stopTechnic(activeCid.value, tid)
+  } catch (e) {
+    technicError.value = errorMessage(e)
+  } finally {
+    busyTid.value = 0
+  }
+}
 
 async function selectBuilding(b: Building): Promise<void> {
   if (!activeCid.value) {
@@ -110,6 +169,7 @@ async function enterCity(cid: number): Promise<void> {
   loading.value = true
   error.value = ''
   closePanel()
+  closeTechnics()
   try {
     if (!city.cities.length) {
       await city.loadCities()
@@ -172,6 +232,7 @@ onBeforeUnmount(() => {
         >
           <option v-for="c in city.cities" :key="c.cid" :value="c.cid">{{ c.name }}（{{ c.cid }}）</option>
         </select>
+        <button class="tech-btn" @click="openTechnics">{{ zhCN.technic.open }}</button>
         <span class="user">{{ auth.user?.name || auth.user?.passport }}</span>
         <button class="logout" @click="onLogout">{{ zhCN.city.logout }}</button>
       </div>
@@ -202,6 +263,17 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </main>
+
+    <TechnicPanel
+      v-if="showTechnics"
+      :info="city.technicInfo"
+      :loading="technicLoading"
+      :error="technicError"
+      :busy-tid="busyTid"
+      @upgrade="onTechnicUpgrade"
+      @stop="onTechnicStop"
+      @close="closeTechnics"
+    />
   </div>
 </template>
 
@@ -260,6 +332,14 @@ select {
   color: var(--text);
   background: transparent;
   border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.tech-btn {
+  padding: 6px 12px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
   border-radius: 4px;
 }
 

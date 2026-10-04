@@ -13,6 +13,7 @@ import (
 	"rxsg/backend/internal/config"
 	"rxsg/backend/internal/db"
 	"rxsg/backend/internal/middleware"
+	"rxsg/backend/internal/technic"
 )
 
 func main() {
@@ -36,6 +37,7 @@ func main() {
 	authHandler := auth.NewHandler(authSvc)
 	buildingSvc := building.NewService(database)
 	buildingHandler := building.NewHandler(buildingSvc)
+	technicHandler := technic.NewHandler(technic.NewService(database))
 	cityHandler := city.NewHandler(city.NewService(database, buildingSvc))
 
 	r := gin.New()
@@ -56,6 +58,7 @@ func main() {
 	authHandler.RegisterProtected(protected)
 	cityHandler.Register(protected)
 	buildingHandler.Register(protected)
+	technicHandler.Register(protected)
 
 	addr := ":" + strconv.Itoa(cfg.Server.Port)
 	log.Printf("rxsg backend 启动于 %s", addr)

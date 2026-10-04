@@ -11,6 +11,7 @@ import type {
   CitySoldier,
   Hero,
   Technic,
+  TechnicInfo,
 } from '@/types'
 
 export async function listCities(): Promise<City[]> {
@@ -67,6 +68,21 @@ export async function stopBuilding(
 
 export async function getTechnics(cid: number): Promise<Technic[]> {
   const { data } = await http.get<Technic[]>(`/cities/${cid}/technics`)
+  return data
+}
+
+export async function getTechnicInfo(cid: number): Promise<TechnicInfo> {
+  const { data } = await http.get<TechnicInfo>(`/cities/${cid}/technics/info`)
+  return data
+}
+
+export async function upgradeTechnic(cid: number, tid: number): Promise<TechnicInfo> {
+  const { data } = await http.post<TechnicInfo>(`/cities/${cid}/technics/upgrade`, { tid })
+  return data
+}
+
+export async function stopTechnic(cid: number, tid: number): Promise<TechnicInfo> {
+  const { data } = await http.post<TechnicInfo>(`/cities/${cid}/technics/stop`, { tid })
   return data
 }
 

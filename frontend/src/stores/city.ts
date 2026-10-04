@@ -2,7 +2,14 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import * as cityApi from '@/api/city'
-import type { Building, BuildingDetail, City, CityDetail, CityResource } from '@/types'
+import type {
+  Building,
+  BuildingDetail,
+  City,
+  CityDetail,
+  CityResource,
+  TechnicInfo,
+} from '@/types'
 
 // 心跳间隔对齐 legacy getCityBaseInfo 的 10s 节奏。
 const HEARTBEAT_MS = 10000
@@ -13,6 +20,7 @@ export const useCityStore = defineStore('city', () => {
   const detail = ref<CityDetail | null>(null)
   const resources = ref<CityResource | null>(null)
   const buildings = ref<Building[]>([])
+  const technicInfo = ref<TechnicInfo | null>(null)
 
   let timer: ReturnType<typeof setInterval> | null = null
 
@@ -27,6 +35,7 @@ export const useCityStore = defineStore('city', () => {
     currentCity.value = d.city
     resources.value = d.base.resource
     buildings.value = d.buildings
+    technicInfo.value = null
     return d
   }
 
@@ -70,12 +79,34 @@ export const useCityStore = defineStore('city', () => {
     return cityApi.getBuildingDetail(cid, bid, x, y)
   }
 
+  async function loadTechnicInfo(cid: number): Promise<TechnicInfo> {
+    technicInfo.value = await cityApi.getTechnicInfo(cid)
+    return technicInfo.value
+  }
+
+  // 研究/取消后后端返回最新科技列表，同时刷新资源。
+  async function upgradeTechnic(cid: number, tid: number): Promise<TechnicInfo> {
+    technicInfo.value = await cityApi.upgradeTechnic(cid, tid)
+    resources.value = await cityApi.getResources(cid)
+    return technicInfo.value
+  }
+
+  async function stopTechnic(cid: number, tid: number): Promise<TechnicInfo> {
+    technicInfo.value = await cityApi.stopTechnic(cid, tid)
+    resources.value = await cityApi.getResources(cid)
+    return technicInfo.value
+  }
+
   function startHeartbeat(cid: number): void {
     stopHeartbeat()
     timer = setInterval(() => {
       void refreshResources(cid)
       // 建筑/科技等到期结算由后端惰性触发，心跳带上建筑列表以刷新等级与状态。
       void refreshBuildings(cid)
+      // 科技面板打开过才刷新，避免无谓请求。
+      if (technicInfo.value) {
+        void loadTechnicInfo(cid)
+      }
     }, HEARTBEAT_MS)
   }
 
@@ -92,6 +123,7 @@ export const useCityStore = defineStore('city', () => {
     detail,
     resources,
     buildings,
+    technicInfo,
     loadCities,
     loadCity,
     refreshResources,
@@ -99,6 +131,9 @@ export const useCityStore = defineStore('city', () => {
     loadBuildingDetail,
     upgradeBuilding,
     stopBuilding,
+    loadTechnicInfo,
+    upgradeTechnic,
+    stopTechnic,
     startHeartbeat,
     stopHeartbeat,
   }
