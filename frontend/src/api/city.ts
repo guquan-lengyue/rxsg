@@ -2,6 +2,7 @@ import http from './http'
 
 import type {
   Alarm,
+  ArmyInfo,
   Building,
   BuildingDetail,
   City,
@@ -9,7 +10,10 @@ import type {
   CityDetail,
   CityResource,
   CitySoldier,
+  DispatchPayload,
+  Field,
   Hero,
+  March,
   Technic,
   TechnicInfo,
 } from '@/types'
@@ -103,5 +107,47 @@ export async function getHeroes(cid: number): Promise<Hero[]> {
 
 export async function getAlarms(cid: number): Promise<Alarm> {
   const { data } = await http.get<Alarm>(`/cities/${cid}/alarms`)
+  return data
+}
+
+// —— 军事：征兵 / 出征 ——
+
+export async function getArmyInfo(cid: number): Promise<ArmyInfo> {
+  const { data } = await http.get<ArmyInfo>(`/cities/${cid}/army/info`)
+  return data
+}
+
+export async function draftSoldier(cid: number, sid: number, count: number): Promise<ArmyInfo> {
+  const { data } = await http.post<ArmyInfo>(`/cities/${cid}/army/draft`, { sid, count })
+  return data
+}
+
+export async function stopDraft(cid: number, qid: number): Promise<ArmyInfo> {
+  const { data } = await http.post<ArmyInfo>(`/cities/${cid}/army/draft/stop`, { qid })
+  return data
+}
+
+export async function dissolveSoldier(cid: number, sid: number, count: number): Promise<ArmyInfo> {
+  const { data } = await http.post<ArmyInfo>(`/cities/${cid}/army/dissolve`, { sid, count })
+  return data
+}
+
+export async function getFields(cid: number): Promise<Field[]> {
+  const { data } = await http.get<Field[]>(`/cities/${cid}/army/fields`)
+  return data
+}
+
+export async function getMarches(cid: number): Promise<March[]> {
+  const { data } = await http.get<March[]>(`/cities/${cid}/army/marches`)
+  return data
+}
+
+export async function dispatchArmy(cid: number, payload: DispatchPayload): Promise<March[]> {
+  const { data } = await http.post<March[]>(`/cities/${cid}/army/dispatch`, payload)
+  return data
+}
+
+export async function recallArmy(cid: number, troopId: number): Promise<March[]> {
+  const { data } = await http.post<March[]>(`/cities/${cid}/army/recall`, { troop_id: troopId })
   return data
 }

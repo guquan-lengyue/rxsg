@@ -180,6 +180,77 @@ export interface Alarm {
   mail: number
 }
 
+// 军事：兵营征兵与部队出征（对齐后端 army 包 DTO）。
+export interface DraftSoldier {
+  sid: number
+  sname: string
+  count: number
+  hp: number
+  ap: number
+  dp: number
+  speed: number
+  woodNeed: number
+  rockNeed: number
+  ironNeed: number
+  foodNeed: number
+  goldNeed: number
+  peopleNeed: number
+  draft_time: number
+  can_draft: boolean
+  no_draft_msg: string
+}
+
+export interface ArmyQueue {
+  qid: number
+  sid: number
+  sname: string
+  count: number
+  state: number
+  time_left: number
+}
+
+export interface ArmyInfo {
+  x: number
+  y: number
+  barracksLevel: number
+  soldiers: DraftSoldier[]
+  queues: ArmyQueue[]
+  people: number
+  people_max: number
+}
+
+export interface March {
+  id: number
+  hero_id: number
+  hero_name: string
+  target_type: number
+  target_id: number
+  target_name: string
+  task: number
+  state: number
+  soldiers: Record<string, number>
+  start_at: number
+  arrive_at: number
+  back_at: number
+  time_left: number
+}
+
+export interface Field {
+  id: number
+  name: string
+  level: number
+  owner_uid: number
+  guard_power: number
+}
+
+export interface DispatchPayload {
+  hero_id: number
+  target_type: number
+  target_id: number
+  task: number
+  soldiers: Record<string, number>
+}
+
 export interface BaseInfo {
   user: User
   resource: CityResource

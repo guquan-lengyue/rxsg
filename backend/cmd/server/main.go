@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"rxsg/backend/internal/army"
 	"rxsg/backend/internal/auth"
 	"rxsg/backend/internal/building"
 	"rxsg/backend/internal/city"
@@ -38,6 +39,7 @@ func main() {
 	buildingSvc := building.NewService(database)
 	buildingHandler := building.NewHandler(buildingSvc)
 	technicHandler := technic.NewHandler(technic.NewService(database))
+	armyHandler := army.NewHandler(army.NewService(database))
 	cityHandler := city.NewHandler(city.NewService(database, buildingSvc))
 
 	r := gin.New()
@@ -59,6 +61,7 @@ func main() {
 	cityHandler.Register(protected)
 	buildingHandler.Register(protected)
 	technicHandler.Register(protected)
+	armyHandler.Register(protected)
 
 	addr := ":" + strconv.Itoa(cfg.Server.Port)
 	log.Printf("rxsg backend 启动于 %s", addr)

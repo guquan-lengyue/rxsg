@@ -41,6 +41,14 @@ func Int(m map[string]any, k string) int {
 		return v
 	case int64:
 		return int(v)
+	case int32:
+		return int(v)
+	case uint:
+		return int(v)
+	case uint64:
+		return int(v)
+	case uint32:
+		return int(v)
 	case float64:
 		return int(v)
 	case bool:
@@ -70,6 +78,14 @@ func Int64(m map[string]any, k string) int64 {
 		return int64(v)
 	case int64:
 		return v
+	case int32:
+		return int64(v)
+	case uint:
+		return int64(v)
+	case uint64:
+		return int64(v)
+	case uint32:
+		return int64(v)
 	case float64:
 		return int64(v)
 	case []byte:

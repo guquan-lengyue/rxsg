@@ -4,13 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 
 import BuildingGrid from '@/components/BuildingGrid.vue'
 import BuildingPanel from '@/components/BuildingPanel.vue'
+import ArmyPanel from '@/components/ArmyPanel.vue'
 import ResourceBar from '@/components/ResourceBar.vue'
 import TechnicPanel from '@/components/TechnicPanel.vue'
 import { errorMessage } from '@/api/http'
 import { zhCN } from '@/lang/zh-CN'
 import { useAuthStore } from '@/stores/auth'
 import { useCityStore } from '@/stores/city'
-import type { Building, BuildingDetail } from '@/types'
+import type { Building, BuildingDetail, DispatchPayload } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -83,6 +84,116 @@ async function onTechnicStop(tid: number): Promise<void> {
     technicError.value = errorMessage(e)
   } finally {
     busyTid.value = 0
+  }
+}
+
+// 军队面板状态
+const showArmy = ref(false)
+const armyLoading = ref(false)
+const armyError = ref('')
+const armyBusy = ref(false)
+
+// 可出征的武将：仅空闲（state=0）。
+const idleHeroes = computed(() => (city.detail?.base.heroes ?? []).filter((h) => h.state === 0))
+
+async function openArmy(): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  showArmy.value = true
+  armyError.value = ''
+  armyLoading.value = true
+  try {
+    await Promise.all([
+      city.loadArmyInfo(activeCid.value),
+      city.loadFields(activeCid.value),
+      city.loadMarches(activeCid.value),
+    ])
+  } catch (e) {
+    armyError.value = errorMessage(e)
+  } finally {
+    armyLoading.value = false
+  }
+}
+
+function closeArmy(): void {
+  showArmy.value = false
+  armyError.value = ''
+  armyBusy.value = false
+}
+
+async function onDraft(sid: number, count: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  armyBusy.value = true
+  armyError.value = ''
+  try {
+    await city.draft(activeCid.value, sid, count)
+  } catch (e) {
+    armyError.value = errorMessage(e)
+  } finally {
+    armyBusy.value = false
+  }
+}
+
+async function onStopDraft(qid: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  armyBusy.value = true
+  armyError.value = ''
+  try {
+    await city.cancelDraft(activeCid.value, qid)
+  } catch (e) {
+    armyError.value = errorMessage(e)
+  } finally {
+    armyBusy.value = false
+  }
+}
+
+async function onDissolve(sid: number, count: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  armyBusy.value = true
+  armyError.value = ''
+  try {
+    await city.dissolve(activeCid.value, sid, count)
+  } catch (e) {
+    armyError.value = errorMessage(e)
+  } finally {
+    armyBusy.value = false
+  }
+}
+
+async function onDispatch(payload: DispatchPayload): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  armyBusy.value = true
+  armyError.value = ''
+  try {
+    await city.dispatch(activeCid.value, payload)
+  } catch (e) {
+    armyError.value = errorMessage(e)
+  } finally {
+    armyBusy.value = false
+  }
+}
+
+async function onRecall(id: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  armyBusy.value = true
+  armyError.value = ''
+  try {
+    await city.recall(activeCid.value, id)
+  } catch (e) {
+    armyError.value = errorMessage(e)
+  } finally {
+    armyBusy.value = false
   }
 }
 
@@ -170,6 +281,7 @@ async function enterCity(cid: number): Promise<void> {
   error.value = ''
   closePanel()
   closeTechnics()
+  closeArmy()
   try {
     if (!city.cities.length) {
       await city.loadCities()
@@ -233,6 +345,7 @@ onBeforeUnmount(() => {
           <option v-for="c in city.cities" :key="c.cid" :value="c.cid">{{ c.name }}（{{ c.cid }}）</option>
         </select>
         <button class="tech-btn" @click="openTechnics">{{ zhCN.technic.open }}</button>
+        <button class="tech-btn" @click="openArmy">{{ zhCN.army.open }}</button>
         <span class="user">{{ auth.user?.name || auth.user?.passport }}</span>
         <button class="logout" @click="onLogout">{{ zhCN.city.logout }}</button>
       </div>
@@ -273,6 +386,23 @@ onBeforeUnmount(() => {
       @upgrade="onTechnicUpgrade"
       @stop="onTechnicStop"
       @close="closeTechnics"
+    />
+
+    <ArmyPanel
+      v-if="showArmy"
+      :info="city.armyInfo"
+      :fields="city.fields"
+      :marches="city.marches"
+      :heroes="idleHeroes"
+      :loading="armyLoading"
+      :error="armyError"
+      :busy="armyBusy"
+      @draft="onDraft"
+      @stop-draft="onStopDraft"
+      @dissolve="onDissolve"
+      @dispatch="onDispatch"
+      @recall="onRecall"
+      @close="closeArmy"
     />
   </div>
 </template>

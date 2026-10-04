@@ -3,11 +3,15 @@ import { ref } from 'vue'
 
 import * as cityApi from '@/api/city'
 import type {
+  ArmyInfo,
   Building,
   BuildingDetail,
   City,
   CityDetail,
   CityResource,
+  DispatchPayload,
+  Field,
+  March,
   TechnicInfo,
 } from '@/types'
 
@@ -21,6 +25,9 @@ export const useCityStore = defineStore('city', () => {
   const resources = ref<CityResource | null>(null)
   const buildings = ref<Building[]>([])
   const technicInfo = ref<TechnicInfo | null>(null)
+  const armyInfo = ref<ArmyInfo | null>(null)
+  const fields = ref<Field[]>([])
+  const marches = ref<March[]>([])
 
   let timer: ReturnType<typeof setInterval> | null = null
 
@@ -36,6 +43,9 @@ export const useCityStore = defineStore('city', () => {
     resources.value = d.base.resource
     buildings.value = d.buildings
     technicInfo.value = null
+    armyInfo.value = null
+    fields.value = []
+    marches.value = []
     return d
   }
 
@@ -97,6 +107,55 @@ export const useCityStore = defineStore('city', () => {
     return technicInfo.value
   }
 
+  // —— 军事：征兵 / 出征 ——
+
+  async function loadArmyInfo(cid: number): Promise<ArmyInfo> {
+    armyInfo.value = await cityApi.getArmyInfo(cid)
+    return armyInfo.value
+  }
+
+  async function loadFields(cid: number): Promise<Field[]> {
+    fields.value = await cityApi.getFields(cid)
+    return fields.value
+  }
+
+  async function loadMarches(cid: number): Promise<March[]> {
+    marches.value = await cityApi.getMarches(cid)
+    return marches.value
+  }
+
+  async function draft(cid: number, sid: number, count: number): Promise<ArmyInfo> {
+    armyInfo.value = await cityApi.draftSoldier(cid, sid, count)
+    resources.value = await cityApi.getResources(cid)
+    return armyInfo.value
+  }
+
+  async function cancelDraft(cid: number, qid: number): Promise<ArmyInfo> {
+    armyInfo.value = await cityApi.stopDraft(cid, qid)
+    resources.value = await cityApi.getResources(cid)
+    return armyInfo.value
+  }
+
+  async function dissolve(cid: number, sid: number, count: number): Promise<ArmyInfo> {
+    armyInfo.value = await cityApi.dissolveSoldier(cid, sid, count)
+    resources.value = await cityApi.getResources(cid)
+    return armyInfo.value
+  }
+
+  // 出征后兵力减少，需同步刷新兵营信息与资源。
+  async function dispatch(cid: number, payload: DispatchPayload): Promise<March[]> {
+    marches.value = await cityApi.dispatchArmy(cid, payload)
+    armyInfo.value = await cityApi.getArmyInfo(cid)
+    resources.value = await cityApi.getResources(cid)
+    return marches.value
+  }
+
+  // 召回后部队进入返程，刷新行军列表。
+  async function recall(cid: number, troopId: number): Promise<March[]> {
+    marches.value = await cityApi.recallArmy(cid, troopId)
+    return marches.value
+  }
+
   function startHeartbeat(cid: number): void {
     stopHeartbeat()
     timer = setInterval(() => {
@@ -106,6 +165,11 @@ export const useCityStore = defineStore('city', () => {
       // 科技面板打开过才刷新，避免无谓请求。
       if (technicInfo.value) {
         void loadTechnicInfo(cid)
+      }
+      // 军队面板打开过才刷新（征兵/行军皆为惰性结算，靠轮询推进）。
+      if (armyInfo.value) {
+        void loadArmyInfo(cid)
+        void loadMarches(cid)
       }
     }, HEARTBEAT_MS)
   }
@@ -124,6 +188,9 @@ export const useCityStore = defineStore('city', () => {
     resources,
     buildings,
     technicInfo,
+    armyInfo,
+    fields,
+    marches,
     loadCities,
     loadCity,
     refreshResources,
@@ -134,6 +201,14 @@ export const useCityStore = defineStore('city', () => {
     loadTechnicInfo,
     upgradeTechnic,
     stopTechnic,
+    loadArmyInfo,
+    loadFields,
+    loadMarches,
+    draft,
+    cancelDraft,
+    dissolve,
+    dispatch,
+    recall,
     startHeartbeat,
     stopHeartbeat,
   }
