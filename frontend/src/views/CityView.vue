@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import BuildingGrid from '@/components/BuildingGrid.vue'
 import BuildingPanel from '@/components/BuildingPanel.vue'
 import ArmyPanel from '@/components/ArmyPanel.vue'
+import HeroPanel from '@/components/HeroPanel.vue'
 import ResourceBar from '@/components/ResourceBar.vue'
 import TechnicPanel from '@/components/TechnicPanel.vue'
 import { errorMessage } from '@/api/http'
@@ -197,6 +198,79 @@ async function onRecall(id: number): Promise<void> {
   }
 }
 
+// 武将面板状态
+const showHeroes = ref(false)
+const heroLoading = ref(false)
+const heroError = ref('')
+const heroBusy = ref(false)
+
+async function openHeroes(): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  showHeroes.value = true
+  heroError.value = ''
+  heroLoading.value = true
+  try {
+    await city.loadHeroInfo(activeCid.value)
+  } catch (e) {
+    heroError.value = errorMessage(e)
+  } finally {
+    heroLoading.value = false
+  }
+}
+
+function closeHeroes(): void {
+  showHeroes.value = false
+  heroError.value = ''
+  heroBusy.value = false
+}
+
+async function onHeroUpgrade(hid: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  heroBusy.value = true
+  heroError.value = ''
+  try {
+    await city.upgradeHero(activeCid.value, hid)
+  } catch (e) {
+    heroError.value = errorMessage(e)
+  } finally {
+    heroBusy.value = false
+  }
+}
+
+async function onHeroStartExpr(hid: number, hours: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  heroBusy.value = true
+  heroError.value = ''
+  try {
+    await city.startHeroExpr(activeCid.value, hid, hours)
+  } catch (e) {
+    heroError.value = errorMessage(e)
+  } finally {
+    heroBusy.value = false
+  }
+}
+
+async function onHeroCancelExpr(hid: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  heroBusy.value = true
+  heroError.value = ''
+  try {
+    await city.cancelHeroExpr(activeCid.value, hid)
+  } catch (e) {
+    heroError.value = errorMessage(e)
+  } finally {
+    heroBusy.value = false
+  }
+}
+
 async function selectBuilding(b: Building): Promise<void> {
   if (!activeCid.value) {
     return
@@ -282,6 +356,7 @@ async function enterCity(cid: number): Promise<void> {
   closePanel()
   closeTechnics()
   closeArmy()
+  closeHeroes()
   try {
     if (!city.cities.length) {
       await city.loadCities()
@@ -346,6 +421,7 @@ onBeforeUnmount(() => {
         </select>
         <button class="tech-btn" @click="openTechnics">{{ zhCN.technic.open }}</button>
         <button class="tech-btn" @click="openArmy">{{ zhCN.army.open }}</button>
+        <button class="tech-btn" @click="openHeroes">{{ zhCN.hero.open }}</button>
         <span class="user">{{ auth.user?.name || auth.user?.passport }}</span>
         <button class="logout" @click="onLogout">{{ zhCN.city.logout }}</button>
       </div>
@@ -403,6 +479,18 @@ onBeforeUnmount(() => {
       @dispatch="onDispatch"
       @recall="onRecall"
       @close="closeArmy"
+    />
+
+    <HeroPanel
+      v-if="showHeroes"
+      :info="city.heroInfo"
+      :loading="heroLoading"
+      :error="heroError"
+      :busy="heroBusy"
+      @upgrade="onHeroUpgrade"
+      @start-expr="onHeroStartExpr"
+      @cancel-expr="onHeroCancelExpr"
+      @close="closeHeroes"
     />
   </div>
 </template>

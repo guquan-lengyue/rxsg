@@ -13,6 +13,7 @@ import (
 	"rxsg/backend/internal/city"
 	"rxsg/backend/internal/config"
 	"rxsg/backend/internal/db"
+	"rxsg/backend/internal/hero"
 	"rxsg/backend/internal/middleware"
 	"rxsg/backend/internal/technic"
 )
@@ -40,6 +41,7 @@ func main() {
 	buildingHandler := building.NewHandler(buildingSvc)
 	technicHandler := technic.NewHandler(technic.NewService(database))
 	armyHandler := army.NewHandler(army.NewService(database))
+	heroHandler := hero.NewHandler(hero.NewService(database))
 	cityHandler := city.NewHandler(city.NewService(database, buildingSvc))
 
 	r := gin.New()
@@ -62,6 +64,7 @@ func main() {
 	buildingHandler.Register(protected)
 	technicHandler.Register(protected)
 	armyHandler.Register(protected)
+	heroHandler.Register(protected)
 
 	addr := ":" + strconv.Itoa(cfg.Server.Port)
 	log.Printf("rxsg backend 启动于 %s", addr)

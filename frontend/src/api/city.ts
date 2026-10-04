@@ -13,6 +13,7 @@ import type {
   DispatchPayload,
   Field,
   Hero,
+  HeroInfo,
   March,
   Technic,
   TechnicInfo,
@@ -149,5 +150,27 @@ export async function dispatchArmy(cid: number, payload: DispatchPayload): Promi
 
 export async function recallArmy(cid: number, troopId: number): Promise<March[]> {
   const { data } = await http.post<March[]>(`/cities/${cid}/army/recall`, { troop_id: troopId })
+  return data
+}
+
+// —— 武将：详情 / 升级 / 历练 ——
+
+export async function getHeroInfo(cid: number): Promise<HeroInfo> {
+  const { data } = await http.get<HeroInfo>(`/cities/${cid}/heroes/info`)
+  return data
+}
+
+export async function upgradeHero(cid: number, hid: number): Promise<HeroInfo> {
+  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/upgrade`, { hid })
+  return data
+}
+
+export async function startHeroExpr(cid: number, hid: number, hours: number): Promise<HeroInfo> {
+  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/expr/start`, { hid, hours })
+  return data
+}
+
+export async function cancelHeroExpr(cid: number, hid: number): Promise<HeroInfo> {
+  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/expr/cancel`, { hid })
   return data
 }

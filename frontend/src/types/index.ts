@@ -169,6 +169,61 @@ export interface Hero {
   curCid: number
 }
 
+// 武将面板（对齐后端 hero 包 DTO）。
+export interface HeroExpr {
+  id: number
+  expr_type: number
+  hours: number
+  state: number
+  started_at: number
+  end_at: number
+  time_left: number
+  exp_gain: number
+}
+
+export interface HeroExprType {
+  type: number
+  name: string
+  min_hour: number
+  max_hour: number
+  exp_per_hour: number
+}
+
+export interface HeroState {
+  hid: number
+  name: string
+  sex: number
+  face: number
+  hero_type: number
+  level: number
+  exp: number
+  state: number
+  loyalty: number
+  hero_health: number
+  command_base: number
+  bravery_base: number
+  bravery_add: number
+  wisdom_base: number
+  wisdom_add: number
+  affairs_base: number
+  affairs_add: number
+  attack_base: number
+  attack_add_on: number
+  defence_base: number
+  defence_add_on: number
+  level_total_exp: number
+  upgrade_exp: number
+  need_exp: number
+  can_upgrade: boolean
+  no_upgrade_msg: string
+  expr: HeroExpr | null
+}
+
+export interface HeroInfo {
+  heroes: HeroState[]
+  exprTypes: HeroExprType[]
+}
+
 export interface Province {
   province: string
   jun: string

@@ -11,6 +11,7 @@ import type {
   CityResource,
   DispatchPayload,
   Field,
+  HeroInfo,
   March,
   TechnicInfo,
 } from '@/types'
@@ -28,6 +29,7 @@ export const useCityStore = defineStore('city', () => {
   const armyInfo = ref<ArmyInfo | null>(null)
   const fields = ref<Field[]>([])
   const marches = ref<March[]>([])
+  const heroInfo = ref<HeroInfo | null>(null)
 
   let timer: ReturnType<typeof setInterval> | null = null
 
@@ -46,6 +48,7 @@ export const useCityStore = defineStore('city', () => {
     armyInfo.value = null
     fields.value = []
     marches.value = []
+    heroInfo.value = null
     return d
   }
 
@@ -156,6 +159,29 @@ export const useCityStore = defineStore('city', () => {
     return marches.value
   }
 
+  // —— 武将：详情 / 升级 / 历练 ——
+
+  async function loadHeroInfo(cid: number): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.getHeroInfo(cid)
+    return heroInfo.value
+  }
+
+  // 升级消耗经验，历练结束惰性加经验：两者都以整份列表回写。
+  async function upgradeHero(cid: number, hid: number): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.upgradeHero(cid, hid)
+    return heroInfo.value
+  }
+
+  async function startHeroExpr(cid: number, hid: number, hours: number): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.startHeroExpr(cid, hid, hours)
+    return heroInfo.value
+  }
+
+  async function cancelHeroExpr(cid: number, hid: number): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.cancelHeroExpr(cid, hid)
+    return heroInfo.value
+  }
+
   function startHeartbeat(cid: number): void {
     stopHeartbeat()
     timer = setInterval(() => {
@@ -170,6 +196,10 @@ export const useCityStore = defineStore('city', () => {
       if (armyInfo.value) {
         void loadArmyInfo(cid)
         void loadMarches(cid)
+      }
+      // 武将面板打开过才刷新（历练到期靠惰性结算推进）。
+      if (heroInfo.value) {
+        void loadHeroInfo(cid)
       }
     }, HEARTBEAT_MS)
   }
@@ -191,6 +221,7 @@ export const useCityStore = defineStore('city', () => {
     armyInfo,
     fields,
     marches,
+    heroInfo,
     loadCities,
     loadCity,
     refreshResources,
@@ -209,6 +240,10 @@ export const useCityStore = defineStore('city', () => {
     dissolve,
     dispatch,
     recall,
+    loadHeroInfo,
+    upgradeHero,
+    startHeroExpr,
+    cancelHeroExpr,
     startHeartbeat,
     stopHeartbeat,
   }
