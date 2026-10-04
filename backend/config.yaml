@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+# 值取自 legacy server/config/db.php
+db:
+  host: mysql6.sqlpub.com
+  port: 3311
+  user: rxsg_test
+  password: "dAcl4uFHEe0LKgsL"
+  name: rxsg_test
+  charset: utf8
+
+jwt:
+  secret: "change-me-rxsg-rewrite-secret"
+  ttl: 86400
+
+# 对齐 legacy ROOT_PATH/sessions（ROOT_PATH = <repo>/server，见 server/game/cfg_js.php:2）
+session:
+  fileDir: "server/sessions"
