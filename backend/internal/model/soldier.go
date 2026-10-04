@@ -1,6 +1,6 @@
 package model
 
-// Soldier 对应 sys_city_soldier（utils.php:834）。
+// Soldier 对应新库 city_soldiers 表。
 type Soldier struct {
 	CID   int `json:"cid"`
 	SID   int `json:"sid"`
@@ -8,5 +8,5 @@ type Soldier struct {
 }
 
 func SoldierFromMap(m map[string]any) Soldier {
-	return Soldier{CID: Int(m, "cid"), SID: Int(m, "sid"), Count: Int(m, "count")}
+	return Soldier{CID: Int(m, "city_id"), SID: Int(m, "soldier_id"), Count: Int(m, "count")}
 }

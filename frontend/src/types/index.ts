@@ -9,7 +9,7 @@ export interface User {
   state: number
   money: number
   honour: number
-  nobility: number
+  nobility: string
   lastcid: number
   regtime: number
   officepos: number

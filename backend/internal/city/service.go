@@ -16,7 +16,7 @@ type Service struct {
 func NewService(d *db.DB) *Service { return &Service{db: d} }
 
 // CityDetail 对齐 doGetCityAllInfo（utils.php:846）的返回顺序：
-// [sys_city, 基础信息, 建筑, 科技, 州郡]。
+// [城市, 基础信息, 建筑, 科技, 州郡]。
 type CityDetail struct {
 	City      model.City       `json:"city"`
 	Base      BaseInfo         `json:"base"`
@@ -26,7 +26,6 @@ type CityDetail struct {
 }
 
 // BaseInfo 对齐 doGetCityBaseInfo（utils.php:798）。
-// 首期省略 isAdult/onLineTime/openIndex/designations/currentYear 等需额外表的分支。
 type BaseInfo struct {
 	User        model.User         `json:"user"`
 	Resource    model.CityResource `json:"resource"`
@@ -39,7 +38,7 @@ type BaseInfo struct {
 
 // ensureOwner 对齐 checkCityOwner（utils.php:211）。
 func (s *Service) ensureOwner(ctx context.Context, uid, cid int) error {
-	ok, err := s.db.Exists(ctx, "select 1 from sys_city where cid=? and uid=? limit 1", cid, uid)
+	ok, err := s.db.Exists(ctx, "select 1 from cities where id=? and user_id=? limit 1", cid, uid)
 	if err != nil {
 		return err
 	}
@@ -50,7 +49,7 @@ func (s *Service) ensureOwner(ctx context.Context, uid, cid int) error {
 }
 
 func (s *Service) ListCities(ctx context.Context, uid int) ([]model.City, error) {
-	rows, err := s.db.FetchRows(ctx, "select * from sys_city where uid=?", uid)
+	rows, err := s.db.FetchRows(ctx, "select * from cities where user_id=?", uid)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +65,7 @@ func (s *Service) GetCityDetail(ctx context.Context, uid, cid int) (*CityDetail,
 		return nil, err
 	}
 
-	cityRow, err := s.db.FetchOne(ctx, "select * from sys_city where cid=?", cid)
+	cityRow, err := s.db.FetchOne(ctx, "select * from cities where id=?", cid)
 	if err == sql.ErrNoRows {
 		return nil, httpx.NotFound("no_city_info", "城市不存在")
 	}
@@ -74,9 +73,6 @@ func (s *Service) GetCityDetail(ctx context.Context, uid, cid int) (*CityDetail,
 		return nil, err
 	}
 	city := model.CityFromMap(cityRow)
-	if sp, serr := s.specialSoldierID(ctx, cid); serr == nil {
-		city.SpacialSid = sp
-	}
 
 	base, err := s.BaseInfo(ctx, uid, cid)
 	if err != nil {
@@ -90,22 +86,18 @@ func (s *Service) GetCityDetail(ctx context.Context, uid, cid int) (*CityDetail,
 	if err != nil {
 		return nil, err
 	}
-	province, err := s.Province(ctx, cid)
-	if err != nil {
-		return nil, err
-	}
 
 	return &CityDetail{
 		City:      city,
 		Base:      *base,
 		Buildings: buildings,
 		Technics:  technics,
-		Province:  province,
+		Province:  model.Province{},
 	}, nil
 }
 
 func (s *Service) BaseInfo(ctx context.Context, uid, cid int) (*BaseInfo, error) {
-	userRow, err := s.db.FetchOne(ctx, "select * from sys_user where uid=?", uid)
+	userRow, err := s.db.FetchOne(ctx, "select * from users where id=?", uid)
 	if err == sql.ErrNoRows {
 		return nil, httpx.NotFound("user_not_found", "用户不存在")
 	}
@@ -113,15 +105,12 @@ func (s *Service) BaseInfo(ctx context.Context, uid, cid int) (*BaseInfo, error)
 		return nil, err
 	}
 
-	openLottery, _ := s.db.FetchCellInt64(ctx, "select value from mem_state where state=150")
-
-	resRow, err := s.db.FetchOne(ctx, "select * from mem_city_resource where cid=?", cid)
+	resRow, err := s.db.FetchOne(ctx, "select * from city_resources where city_id=?", cid)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 
-	heroRows, err := s.db.FetchRows(ctx,
-		"select * from sys_city_hero h left join mem_hero_blood m on m.hid=h.hid where h.cid=? and h.uid=?", cid, uid)
+	heroRows, err := s.db.FetchRows(ctx, "select * from heroes where city_id=? and user_id=?", cid, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +121,7 @@ func (s *Service) BaseInfo(ctx context.Context, uid, cid int) (*BaseInfo, error)
 		heroes = append(heroes, h)
 	}
 
-	soldierRows, err := s.db.FetchRows(ctx, "select * from sys_city_soldier where cid=? order by sid", cid)
+	soldierRows, err := s.db.FetchRows(ctx, "select * from city_soldiers where city_id=? order by soldier_id", cid)
 	if err != nil {
 		return nil, err
 	}
@@ -141,37 +130,22 @@ func (s *Service) BaseInfo(ctx context.Context, uid, cid int) (*BaseInfo, error)
 		troops = append(troops, model.SoldierFromMap(r))
 	}
 
-	defRows, err := s.db.FetchRows(ctx, "select * from sys_city_defence where cid=? order by did", cid)
-	if err != nil {
-		return nil, err
-	}
-	defences := make([]model.Defence, 0, len(defRows))
-	for _, r := range defRows {
-		defences = append(defences, model.DefenceFromMap(r))
-	}
-
-	alarmRow, err := s.db.FetchOne(ctx, "select * from sys_alarm where uid=?", uid)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
 	return &BaseInfo{
-		User:        model.UserFromMap(userRow),
-		Resource:    model.CityResourceFromMap(resRow),
-		Heroes:      heroes,
-		Troops:      troops,
-		Defences:    defences,
-		Alarm:       model.AlarmFromMap(alarmRow),
-		OpenLottery: int(openLottery),
+		User:     model.UserFromMap(userRow),
+		Resource: model.CityResourceFromMap(resRow),
+		Heroes:   heroes,
+		Troops:   troops,
+		Defences: []model.Defence{},
+		Alarm:    model.Alarm{},
 	}, nil
 }
 
-// heroCurCID 对齐 doGetHeroState（interface.php:173）：state==4（驻守）时取 sys_troops.targetcid。
+// heroCurCID 对齐 doGetHeroState（interface.php:173）：state==4（驻守）时取 troops.target_id。
 func (s *Service) heroCurCID(ctx context.Context, h model.Hero) int {
 	if h.State != 4 {
 		return h.CID
 	}
-	target, err := s.db.FetchCellInt64(ctx, "select targetcid from sys_troops where hid=? limit 1", h.HID)
+	target, err := s.db.FetchCellInt64(ctx, "select target_id from troops where hero_id=? limit 1", h.HID)
 	if err != nil {
 		return h.CID
 	}
@@ -181,9 +155,8 @@ func (s *Service) heroCurCID(ctx context.Context, h model.Hero) int {
 // Buildings 对齐 getCityBuildingInfo（utils.php:776-792）。
 func (s *Service) Buildings(ctx context.Context, cid int) ([]model.Building, error) {
 	rows, err := s.db.FetchRows(ctx,
-		"select b.*,c.name as bname,c.description as buildingDescription,l.description as level_description,l.using_people "+
-			"from cfg_building c,sys_building b left join cfg_building_level l on l.bid=b.bid and l.`level`=b.`level` "+
-			"where b.`cid`=? and c.`bid`=b.`bid`", cid)
+		"select b.*, c.name as bname from buildings b left join cfg_buildings c on c.bid=b.building_id where b.city_id=?",
+		cid)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +175,7 @@ func (s *Service) Buildings(ctx context.Context, cid int) ([]model.Building, err
 
 // Technics 对齐 utils.php:859。
 func (s *Service) Technics(ctx context.Context, cid int) ([]model.Technic, error) {
-	rows, err := s.db.FetchRows(ctx, "select tid,level from sys_city_technic where cid=?", cid)
+	rows, err := s.db.FetchRows(ctx, "select technic_id,level from city_technics where city_id=?", cid)
 	if err != nil {
 		return nil, err
 	}
@@ -213,38 +186,13 @@ func (s *Service) Technics(ctx context.Context, cid int) ([]model.Technic, error
 	return out, nil
 }
 
-// Province 对齐 utils.php:861。
-func (s *Service) Province(ctx context.Context, cid int) (model.Province, error) {
-	row, err := s.db.FetchOne(ctx, "select province,jun from mem_world where wid=?", cid2wid(cid))
-	if err == sql.ErrNoRows {
-		return model.Province{}, nil
-	}
-	if err != nil {
-		return model.Province{}, err
-	}
-	return model.ProvinceFromMap(row), nil
-}
-
-// specialSoldierID 对齐 getSpacialSoldierId（utils.php:865）。
-func (s *Service) specialSoldierID(ctx context.Context, cid int) (int, error) {
-	v, err := s.db.FetchCellInt64(ctx, "select sid from cfg_soldier_special_city where cid=? and type<>'4'", cid)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	return int(v), nil
-}
-
-// Resources 是心跳接口：只读返回 mem_city_resource 当前值。
-// TODO(phase2): legacy getCityInfo 会触发 SetCityBaseProduce(utils.php:2145) 与
-// UpdateUsersCityResource(utils.php:2329) 写库累积，首期只读不写。
+// Resources 是心跳接口：只读返回 city_resources 当前值。
+// TODO(phase2): 资源按时间累积写库。
 func (s *Service) Resources(ctx context.Context, uid, cid int) (model.CityResource, error) {
 	if err := s.ensureOwner(ctx, uid, cid); err != nil {
 		return model.CityResource{}, err
 	}
-	row, err := s.db.FetchOne(ctx, "select * from mem_city_resource where cid=?", cid)
+	row, err := s.db.FetchOne(ctx, "select * from city_resources where city_id=?", cid)
 	if err == sql.ErrNoRows {
 		return model.CityResource{}, httpx.NotFound("no_city_info", "城市资源不存在")
 	}
@@ -283,11 +231,7 @@ func (s *Service) GetDefences(ctx context.Context, uid, cid int) ([]model.Defenc
 	if err := s.ensureOwner(ctx, uid, cid); err != nil {
 		return nil, err
 	}
-	base, err := s.BaseInfo(ctx, uid, cid)
-	if err != nil {
-		return nil, err
-	}
-	return base.Defences, nil
+	return []model.Defence{}, nil
 }
 
 func (s *Service) GetHeroes(ctx context.Context, uid, cid int) ([]model.Hero, error) {
@@ -305,16 +249,5 @@ func (s *Service) GetAlarms(ctx context.Context, uid, cid int) (model.Alarm, err
 	if err := s.ensureOwner(ctx, uid, cid); err != nil {
 		return model.Alarm{}, err
 	}
-	row, err := s.db.FetchOne(ctx, "select * from sys_alarm where uid=?", uid)
-	if err != nil && err != sql.ErrNoRows {
-		return model.Alarm{}, err
-	}
-	return model.AlarmFromMap(row), nil
-}
-
-// cid2wid 对齐 utils.php:663。
-func cid2wid(cid int) int {
-	y := cid / 1000
-	x := cid % 1000
-	return (y/10)*10000 + (x/10)*100 + (y%10)*10 + (x%10)
+	return model.Alarm{}, nil
 }

@@ -1,6 +1,6 @@
 package model
 
-// Hero 对应 sys_city_hero h left join mem_hero_blood m（utils.php:832）。
+// Hero 对应新库 heroes 表；force/energy 等新库未提供的字段补 0。
 type Hero struct {
 	HID         int    `json:"hid"`
 	UID         int    `json:"uid"`
@@ -20,28 +20,24 @@ type Hero struct {
 	ForceMax    int    `json:"force_max"`
 	Energy      int    `json:"energy"`
 	EnergyMax   int    `json:"energy_max"`
-	CurCID      int    `json:"curCid"` // 对齐 doGetHeroState：state==4 时取 sys_troops.targetcid
+	CurCID      int    `json:"curCid"`
 }
 
 func HeroFromMap(m map[string]any) Hero {
 	return Hero{
-		HID:         Int(m, "hid"),
-		UID:         Int(m, "uid"),
-		CID:         Int(m, "cid"),
+		HID:         Int(m, "id"),
+		UID:         Int(m, "user_id"),
+		CID:         Int(m, "city_id"),
 		Name:        Str(m, "name"),
 		Sex:         Int(m, "sex"),
 		Face:        Int(m, "face"),
 		State:       Int(m, "state"),
 		Level:       Int(m, "level"),
-		HeroType:    Int(m, "herotype"),
+		HeroType:    Int(m, "hero_type"),
 		CommandBase: Int(m, "command_base"),
 		AffairsBase: Int(m, "affairs_base"),
 		BraveryBase: Int(m, "bravery_base"),
 		WisdomBase:  Int(m, "wisdom_base"),
 		Loyalty:     Int(m, "loyalty"),
-		Force:       Int(m, "force"),
-		ForceMax:    Int(m, "force_max"),
-		Energy:      Int(m, "energy"),
-		EnergyMax:   Int(m, "energy_max"),
 	}
 }

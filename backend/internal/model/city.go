@@ -1,24 +1,24 @@
 package model
 
-// City 对应 sys_city（utils.php:849 select *）。
+// City 对应新库 cities 表。
 type City struct {
 	CID        int    `json:"cid"`
 	UID        int    `json:"uid"`
 	Name       string `json:"name"`
 	IsSpecial  int    `json:"isSpecial"`
-	SpacialSid int    `json:"spacialSid"` // 由 getSpacialSoldierId(cid) 附加（utils.php:851）
+	SpacialSid int    `json:"spacialSid"` // 新库无专属兵种表，恒为 0
 }
 
 func CityFromMap(m map[string]any) City {
 	return City{
-		CID:       Int(m, "cid"),
-		UID:       Int(m, "uid"),
+		CID:       Int(m, "id"),
+		UID:       Int(m, "user_id"),
 		Name:      Str(m, "name"),
 		IsSpecial: Int(m, "is_special"),
 	}
 }
 
-// CityResource 对应 mem_city_resource（utils.php:828）。
+// CityResource 对应新库 city_resources 表；未提供的产出/用工字段补 0。
 type CityResource struct {
 	CID            int   `json:"cid"`
 	Wood           int64 `json:"wood"`
@@ -52,38 +52,27 @@ type CityResource struct {
 
 func CityResourceFromMap(m map[string]any) CityResource {
 	return CityResource{
-		CID:            Int(m, "cid"),
+		CID:            Int(m, "city_id"),
 		Wood:           Int64(m, "wood"),
-		WoodAdd:        Int64(m, "wood_add"),
 		WoodMax:        Int64(m, "wood_max"),
 		Rock:           Int64(m, "rock"),
-		RockAdd:        Int64(m, "rock_add"),
 		RockMax:        Int64(m, "rock_max"),
 		Iron:           Int64(m, "iron"),
-		IronAdd:        Int64(m, "iron_add"),
 		IronMax:        Int64(m, "iron_max"),
 		Food:           Int64(m, "food"),
-		FoodAdd:        Int64(m, "food_add"),
 		FoodMax:        Int64(m, "food_max"),
-		FoodArmyUse:    Int64(m, "food_army_use"),
 		Gold:           Int64(m, "gold"),
-		GoldRate:       Int(m, "gold_rate"),
 		GoldMax:        Int64(m, "gold_max"),
 		People:         Int64(m, "people"),
 		PeopleMax:      Int64(m, "people_max"),
-		PeopleStable:   Int64(m, "people_stable"),
-		PeopleWorking:  Int64(m, "people_working"),
-		PeopleBuilding: Int64(m, "people_building"),
 		Morale:         Int(m, "morale"),
 		Tax:            Int(m, "tax"),
 		Complaint:      Int(m, "complaint"),
-		HeroFee:        Int64(m, "hero_fee"),
 		Vacation:       Int(m, "vacation"),
-		Forbidden:      Int(m, "forbidden"),
 	}
 }
 
-// Alarm 对应 sys_alarm（utils.php:838）。
+// Alarm 新库无告警表，恒为零值。
 type Alarm struct {
 	UID  int `json:"uid"`
 	Task int `json:"task"`
@@ -91,5 +80,5 @@ type Alarm struct {
 }
 
 func AlarmFromMap(m map[string]any) Alarm {
-	return Alarm{UID: Int(m, "uid"), Task: Int(m, "task"), Mail: Int(m, "mail")}
+	return Alarm{UID: Int(m, "uid")}
 }

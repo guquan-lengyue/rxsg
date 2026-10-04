@@ -30,7 +30,8 @@ func main() {
 	defer database.Close()
 
 	jwtMgr := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.TTL)
-	authSvc := auth.NewService(database, jwtMgr, cfg.Session.FileDir)
+	sessionStore := auth.NewSessionStore()
+	authSvc := auth.NewService(database, jwtMgr, sessionStore)
 	authHandler := auth.NewHandler(authSvc)
 	cityHandler := city.NewHandler(city.NewService(database))
 
@@ -46,9 +47,9 @@ func main() {
 	// 公开路由：登录、登录公告。
 	authHandler.RegisterPublic(api)
 
-	// 受保护路由：需携带 Bearer JWT，且 (uid,sid) 与 sys_sessions 一致。
+	// 受保护路由：需携带 Bearer JWT，且 (uid,sid) 与内存会话一致。
 	protected := api.Group("")
-	protected.Use(middleware.RequireAuth(database, jwtMgr))
+	protected.Use(middleware.RequireAuth(jwtMgr, sessionStore))
 	authHandler.RegisterProtected(protected)
 	cityHandler.Register(protected)
 
