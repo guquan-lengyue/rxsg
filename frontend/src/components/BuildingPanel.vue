@@ -35,10 +35,10 @@ const timeText = computed(() => (next.value ? formatLeft(next.value.upgradeTime)
 </script>
 
 <template>
-  <aside class="panel">
-    <header class="panel-head">
+  <aside class="panel u-modal">
+    <header class="u-title">
       <strong>{{ detail?.name || '建筑' }}</strong>
-      <button class="close" @click="emit('close')">×</button>
+      <button class="u-close" title="关闭" @click="emit('close')"></button>
     </header>
 
     <p v-if="loading" class="hint">{{ zhCN.city.loading }}</p>
@@ -102,29 +102,7 @@ const timeText = computed(() => (next.value ? formatLeft(next.value.upgradeTime)
   flex-direction: column;
   gap: 10px;
   min-width: 220px;
-  padding: 14px 16px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-}
-
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.panel-head strong {
-  color: var(--accent);
-}
-
-.close {
-  color: var(--text-dim);
-  background: transparent;
-  border: none;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
+  padding: 12px 14px;
 }
 
 .row {

@@ -94,10 +94,10 @@ function onDispatch(): void {
 
 <template>
   <div class="overlay" @click.self="emit('close')">
-    <div class="modal">
-      <header class="modal-head">
+    <div class="modal u-modal">
+      <header class="u-title">
         <strong>{{ zhCN.army.title }}</strong>
-        <button class="close" @click="emit('close')">×</button>
+        <button class="u-close" title="关闭" @click="emit('close')"></button>
       </header>
 
       <div class="tabs">
@@ -301,49 +301,30 @@ function onDispatch(): void {
   max-height: 86vh;
   padding: 16px;
   overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-}
-
-.modal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-head strong {
-  color: var(--accent);
-  font-size: 16px;
-}
-
-.close {
-  color: var(--text-dim);
-  background: transparent;
-  border: none;
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
 }
 
 .tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   border-bottom: 1px solid var(--panel-border);
 }
 
 .tabs button {
-  padding: 6px 14px;
-  color: var(--text-dim);
-  background: transparent;
+  height: 30px;
+  padding: 0 18px;
+  color: #e9dcc0;
+  background: url('/images/channel_tab1.png') center / 100% 100% no-repeat;
   border: none;
-  border-bottom: 2px solid transparent;
   cursor: pointer;
 }
 
+.tabs button:hover:not(.active) {
+  background-image: url('/images/channel_tab1_hl.png');
+}
+
 .tabs button.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+  color: #ffe9a8;
+  background-image: url('/images/channel_tab1_sl.png');
 }
 
 .badge {

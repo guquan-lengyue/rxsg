@@ -419,9 +419,9 @@ onBeforeUnmount(() => {
         >
           <option v-for="c in city.cities" :key="c.cid" :value="c.cid">{{ c.name }}（{{ c.cid }}）</option>
         </select>
-        <button class="tech-btn" @click="openTechnics">{{ zhCN.technic.open }}</button>
-        <button class="tech-btn" @click="openArmy">{{ zhCN.army.open }}</button>
-        <button class="tech-btn" @click="openHeroes">{{ zhCN.hero.open }}</button>
+        <button class="nav-tech" type="button" @click="openTechnics">{{ zhCN.technic.open }}</button>
+        <button class="nav-btn army" type="button" title="军事" @click="openArmy"></button>
+        <button class="nav-btn hero" type="button" title="武将" @click="openHeroes"></button>
         <span class="user">{{ auth.user?.name || auth.user?.passport }}</span>
         <button class="logout" @click="onLogout">{{ zhCN.city.logout }}</button>
       </div>
@@ -553,12 +553,62 @@ select {
   border-radius: 4px;
 }
 
-.tech-btn {
-  padding: 6px 12px;
-  color: var(--accent);
-  background: transparent;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
+/* 顶栏模块按钮：原版 topbutton 贴图（军事/武将 自带文字） */
+.nav-btn {
+  height: 30px;
+  padding: 0 6px;
+  border: none;
+  background: center / 100% 100% no-repeat;
+}
+
+.nav-btn:active {
+  transform: translateY(1px);
+}
+
+.nav-btn.army {
+  background-image: url('/images/topbutton_army.png');
+}
+.nav-btn.army:hover:not(:active) {
+  background-image: url('/images/topbutton_army_on.png');
+}
+.nav-btn.army:active {
+  background-image: url('/images/topbutton_army_down.png');
+}
+
+.nav-btn.hero {
+  background-image: url('/images/topbutton_hero.png');
+}
+.nav-btn.hero:hover:not(:active) {
+  background-image: url('/images/topbutton_hero_on.png');
+}
+.nav-btn.hero:active {
+  background-image: url('/images/topbutton_hero_down.png');
+}
+
+/* 科技：原版无对应 topbutton，用 topicon_tactic 图标 + 文字合成 */
+.nav-tech {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  color: #f0e3c2;
+  background: linear-gradient(180deg, #4c3b24, #2c2116);
+  border: 1px solid #6d582f;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.nav-tech::before {
+  content: '';
+  width: 17px;
+  height: 17px;
+  background: url('/images/topicon_tactic.png') center / 100% 100% no-repeat;
+}
+
+.nav-tech:hover {
+  color: #ffe9a8;
+  border-color: var(--accent);
 }
 
 .content {

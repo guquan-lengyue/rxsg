@@ -55,10 +55,10 @@ function onStartExpr(h: HeroState): void {
 
 <template>
   <div class="overlay" @click.self="emit('close')">
-    <div class="modal">
-      <header class="modal-head">
+    <div class="modal u-modal">
+      <header class="u-title">
         <strong>{{ zhCN.hero.title }}</strong>
-        <button class="close" @click="emit('close')">×</button>
+        <button class="u-close" title="关闭" @click="emit('close')"></button>
       </header>
 
       <p v-if="loading" class="hint">{{ zhCN.city.loading }}</p>
@@ -168,29 +168,6 @@ function onStartExpr(h: HeroState): void {
   max-height: 86vh;
   padding: 16px;
   overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-}
-
-.modal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-head strong {
-  color: var(--accent);
-  font-size: 16px;
-}
-
-.close {
-  color: var(--text-dim);
-  background: transparent;
-  border: none;
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
 }
 
 .list {

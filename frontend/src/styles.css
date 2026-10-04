@@ -1,11 +1,11 @@
 :root {
   color-scheme: dark;
-  --bg: #0f1620;
-  --panel: #1b2634;
-  --panel-border: #2b3a4a;
-  --text: #d8e2ec;
-  --text-dim: #8ba0b5;
-  --accent: #d9a441;
+  --bg: #10161f;
+  --panel: rgba(24, 30, 40, 0.86);
+  --panel-border: #3d4c2a;
+  --text: #ece3d0;
+  --text-dim: #b3a88e;
+  --accent: #e0b457;
   --danger: #d9534f;
   font-family: 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
 }
@@ -16,8 +16,57 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    linear-gradient(rgba(9, 13, 19, 0.74), rgba(9, 13, 19, 0.86)),
+    url('/images/bj.jpg') center / cover fixed no-repeat,
+    var(--bg);
   color: var(--text);
+}
+
+/* ---- 原版 UI 皮肤通用类（9-slice 贴图） ---- */
+
+/* 弹窗/面板外框：board_popup.png（原版 Canvas.PopupDialog）。 */
+.u-modal {
+  border: 12px solid transparent;
+  border-image: url('/images/board_popup.png') 10 10 10 10 fill / 12px round;
+  background: transparent;
+}
+
+/* 标题条：popup_title.png（原版 Canvas.PopupTitle）。 */
+.u-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 6px solid transparent;
+  border-image: url('/images/popup_title.png') 8 8 8 8 fill / 6px round;
+  background: transparent;
+}
+
+.u-title > strong {
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.u-title > .u-close {
+  margin-left: 8px;
+}
+
+/* 关闭小按钮：lottery_close 三态。 */
+.u-close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: url('/images/lottery_close.png') center / 100% 100% no-repeat;
+}
+.u-close:hover {
+  background-image: url('/images/lottery_close_over.png');
+}
+.u-close:active {
+  background-image: url('/images/lottery_close_select.png');
 }
 
 button {

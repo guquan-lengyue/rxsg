@@ -40,9 +40,9 @@ const items = computed(() => {
   flex-wrap: wrap;
   gap: 8px 20px;
   padding: 12px 16px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  border: 8px solid transparent;
+  border-image: url('/images/board_tip.png') 6 6 6 6 fill / 8px round;
+  background: transparent;
 }
 
 .resource-item {
