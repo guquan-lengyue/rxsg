@@ -1,4 +1,5 @@
 import type { Building } from '@/types'
+import { buildingIntro, img } from '@/assets/img'
 
 export interface RenderOptions {
   cellSize?: number
@@ -10,12 +11,25 @@ export interface RenderOptions {
 export const CELL_SIZE = 56
 
 const COLORS = {
-  grid: '#2b3a4a',
-  idle: '#3a5a7a',
+  grid: '#1f2a22',
+  idle: '#31413a',
   upgrading: '#b8860b',
-  built: '#4a7a4a',
+  built: '#3f5f3f',
   text: '#eaf2fb',
   countdown: '#ffd479',
+}
+
+const GROUND = img('block_ground.png')
+
+// 贴图缓存：首次引用时异步加载，加载完成后由 BuildingGrid 的 1s 定时重绘拾取。
+const imgCache = new Map<string, HTMLImageElement>()
+function sprite(url: string): HTMLImageElement | undefined {
+  const hit = imgCache.get(url)
+  if (hit) return hit.complete && hit.naturalWidth > 0 ? hit : undefined
+  const im = new Image()
+  im.src = url
+  imgCache.set(url, im)
+  return undefined
 }
 
 // 原生 Canvas 2D 绘制城内网格：按 sys_building.x/y/bid/level/state 布局。
@@ -48,7 +62,17 @@ export function drawCityGrid(
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
 
-  // 背景网格
+  // 地面：有 ground 贴图则平铺，否则纯色
+  const groundImg = sprite(GROUND)
+  if (groundImg) {
+    const pat = ctx.createPattern(groundImg, 'repeat')
+    ctx.fillStyle = pat ?? '#2a3a2c'
+  } else {
+    ctx.fillStyle = '#2a3a2c'
+  }
+  ctx.fillRect(0, 0, width, height)
+
+  // 网格线
   ctx.strokeStyle = COLORS.grid
   ctx.lineWidth = 1
   for (let x = 0; x <= cols; x += 1) {
@@ -69,24 +93,50 @@ export function drawCityGrid(
     const py = b.y * cell
     const upgrading = b.state === 1 || b.state_timeleft > 0
 
+    // 格底
     ctx.fillStyle = upgrading ? COLORS.upgrading : b.level > 0 ? COLORS.built : COLORS.idle
-    ctx.fillRect(px + 4, py + 4, cell - 8, cell - 8)
+    ctx.fillRect(px + 3, py + 3, cell - 6, cell - 6)
+
+    // 建筑贴图（building_intro_{bid}.png），缺失时回退为格底色块
+    const sp = sprite(buildingIntro(b.bid))
+    if (sp) {
+      const pad = 4
+      const iw = cell - pad * 2
+      const ih = iw * (sp.naturalHeight / Math.max(1, sp.naturalWidth))
+      const dispW = Math.min(iw, cell - pad)
+      const dispH = Math.min(ih, cell - pad)
+      const iy = py + cell - pad - dispH
+      ctx.save()
+      ctx.beginPath()
+      ctx.roundRect(px + 3, py + 3, cell - 6, cell - 6, 4)
+      ctx.clip()
+      ctx.drawImage(sp, px + pad, iy, dispW, dispH)
+      if (upgrading) {
+        ctx.fillStyle = 'rgba(184,134,11,0.35)'
+        ctx.fillRect(px + 3, py + 3, cell - 6, cell - 6)
+      }
+      ctx.restore()
+    }
 
     ctx.strokeStyle = COLORS.grid
-    ctx.strokeRect(px + 4.5, py + 4.5, cell - 9, cell - 9)
+    ctx.strokeRect(px + 3.5, py + 3.5, cell - 7, cell - 7)
 
-    ctx.fillStyle = COLORS.text
-    ctx.font = '12px "Microsoft YaHei", sans-serif'
+    // 等级标签（带阴影便于在贴图上阅读）
+    ctx.font = 'bold 10px "Microsoft YaHei", sans-serif'
     ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(`${b.bid}`, px + cell / 2, py + cell / 2 - 8)
-    ctx.fillText(`Lv${b.level}`, px + cell / 2, py + cell / 2 + 8)
+    ctx.textBaseline = 'bottom'
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'
+    ctx.fillText(`Lv${b.level}`, px + cell / 2 + 1, py + cell - 4)
+    ctx.fillStyle = COLORS.text
+    ctx.fillText(`Lv${b.level}`, px + cell / 2, py + cell - 5)
 
     if (upgrading) {
+      ctx.font = '9px "Microsoft YaHei", sans-serif'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = 'rgba(0,0,0,0.75)'
+      ctx.fillText(formatLeft(b.state_endtime - now), px + cell / 2 + 1, py + cell / 2 + 1)
       ctx.fillStyle = COLORS.countdown
-      ctx.font = '10px "Microsoft YaHei", sans-serif'
-      // state_endtime 为服务端绝对时间戳，用本地时间实时倒计时
-      ctx.fillText(formatLeft(b.state_endtime - now), px + cell / 2, py + cell - 8)
+      ctx.fillText(formatLeft(b.state_endtime - now), px + cell / 2, py + cell / 2)
     }
   }
 }
