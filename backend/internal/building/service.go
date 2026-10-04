@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"rxsg/backend/internal/db"
+	"rxsg/backend/internal/game"
 	"rxsg/backend/internal/httpx"
 	"rxsg/backend/internal/model"
 )
@@ -190,7 +191,8 @@ func (s *Service) nextInfo(ctx context.Context, cid int, b model.Building, name 
 	next.IronNeed = model.Int64(cfg, "upgrade_iron")
 	next.FoodNeed = model.Int64(cfg, "upgrade_food")
 	next.GoldNeed = model.Int64(cfg, "upgrade_gold")
-	next.UpgradeTime = model.Int64(cfg, "upgrade_time")
+	// 新库无建筑加速科技（cfg_technics 无对应 tid），系数取 1。
+	next.UpgradeTime = game.ScaledSeconds(model.Int64(cfg, "upgrade_time"), 1)
 
 	if b.State == 1 {
 		next.CanUpgrade = false
@@ -266,7 +268,7 @@ func (s *Service) Upgrade(ctx context.Context, uid, cid, bid, x, y int) ([]model
 	iron := model.Int64(cfg, "upgrade_iron")
 	food := model.Int64(cfg, "upgrade_food")
 	gold := model.Int64(cfg, "upgrade_gold")
-	upTime := model.Int64(cfg, "upgrade_time")
+	upTime := game.ScaledSeconds(model.Int64(cfg, "upgrade_time"), 1)
 
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
