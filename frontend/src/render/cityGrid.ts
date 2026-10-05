@@ -15,9 +15,12 @@ const COLORS = {
   idle: '#31413a',
   upgrading: '#b8860b',
   built: '#3f5f3f',
-  text: '#eaf2fb',
   countdown: '#ffd479',
 }
+
+// 等级角标贴图原生尺寸（原版 BuildingGrid.levelImage 为 19×14），见 tools/export/BloodWar BuildingGrid.as
+const LEVEL_BADGE_W = 19
+const LEVEL_BADGE_H = 14
 
 const GROUND = img('block_ground.png')
 
@@ -121,17 +124,17 @@ export function drawCityGrid(
     ctx.strokeStyle = COLORS.grid
     ctx.strokeRect(px + 3.5, py + 3.5, cell - 7, cell - 7)
 
-    // 等级标签（带阴影便于在贴图上阅读）
-    ctx.font = 'bold 10px "Microsoft YaHei", sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'bottom'
-    ctx.fillStyle = 'rgba(0,0,0,0.75)'
-    ctx.fillText(`Lv${b.level}`, px + cell / 2 + 1, py + cell - 4)
-    ctx.fillStyle = COLORS.text
-    ctx.fillText(`Lv${b.level}`, px + cell / 2, py + cell - 5)
+    // 等级角标：用原版 images/level_{n}.png 贴图（右下角），替代手绘 Lv 文本
+    if (b.level > 0) {
+      const lv = sprite(img(`level_${b.level}.png`))
+      if (lv) {
+        ctx.drawImage(lv, px + cell - LEVEL_BADGE_W - 3, py + cell - LEVEL_BADGE_H - 3, LEVEL_BADGE_W, LEVEL_BADGE_H)
+      }
+    }
 
     if (upgrading) {
       ctx.font = '9px "Microsoft YaHei", sans-serif'
+      ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillStyle = 'rgba(0,0,0,0.75)'
       ctx.fillText(formatLeft(b.state_endtime - now), px + cell / 2 + 1, py + cell / 2 + 1)
