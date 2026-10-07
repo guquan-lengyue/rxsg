@@ -6,7 +6,7 @@ db:
   host: mysql6.sqlpub.com
   port: 3311
   user: rxsg_test
-  password: "dAcl4uFHEe0LKgsL"
+  password: "RIlHFAeNwv1CJbTr"
   name: rxsg_test
   charset: utf8
 
