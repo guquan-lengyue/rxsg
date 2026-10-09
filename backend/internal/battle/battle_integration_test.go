@@ -147,6 +147,8 @@ func TestHeroBattleAdd_Formulas(t *testing.T) {
 	// 科技：6(统率)=3、9(攻击)=2、16(生命)=1。
 	exec(t, f.DB, "insert into city_technics (city_id, technic_id, level) values (?,6,3),(?,9,2),(?,16,1) on duplicate key update level=values(level)",
 		f.CID, f.CID, f.CID)
+	// legacy `hid<1027` 名将判定 → 新库 heroes.npc_id>0（名将卡）。
+	exec(t, f.DB, "update heroes set npc_id=36 where id=?", f.HID1)
 
 	h, err := s.heroBattleAdd(ctx, f.HID1, f.CID, 1)
 	if err != nil {
@@ -164,13 +166,22 @@ func TestHeroBattleAdd_Formulas(t *testing.T) {
 	if math.Abs(h.gongji-0.1) > 1e-9 {
 		t.Fatalf("gongji=%v", h.gongji)
 	}
-	// hid<1027 名将：heroattack = bravery_base*(1+0.05*2) = 90*1.1 = 99
+	// 名将：heroattack = bravery_base*(1+0.05*2) = 90*1.1 = 99
 	if math.Abs(h.heroattack-99) > 1e-9 {
 		t.Fatalf("heroattack=%v want 99", h.heroattack)
 	}
-	// heroshoot = command_base*(1+0.05*科技14=0) = 80
+	// 名将：heroshoot = command_base*(1+0.05*科技14=0) = 80
 	if math.Abs(h.heroshoot-80) > 1e-9 {
 		t.Fatalf("heroshoot=%v want 80", h.heroshoot)
+	}
+
+	// 非名将（f.HID2 npc_id=0）→ 名将类加成恒 0。
+	h2, err := s.heroBattleAdd(ctx, f.HID2, f.CID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h2.heroattack != 0 || h2.heroshoot != 0 || h2.herodefence != 0 || h2.heroblood != 0 {
+		t.Fatalf("非名将加成应为 0: %+v", h2)
 	}
 }
 

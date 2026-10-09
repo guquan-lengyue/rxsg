@@ -55,7 +55,9 @@ func (s *Service) heroBattleAdd(ctx context.Context, hid, cid, battletype int) (
 	mjblood := 0.0   // 名将生命加成（affairs_base）
 	myspeed := 0.0   // 名将速度加成（speed_add_on 的 10% 向上取整）
 	hrange := 0.0    // 名将抛射加成（command_base）
-	if hid > 0 && hid < 1027 {
+	// legacy 以 `hid<1027` 判定名将（1..1026 为预置名将行）。新库无预置名将行，
+	// 以 heroes.npc_id（名将卡 NPC id，见 0007 迁移）>0 等价映射。
+	if hid > 0 && modelInt64(hero, "npc_id") > 0 {
 		mjact = modelFloat(hero, "bravery_base")
 		mjdef = modelFloat(hero, "wisdom_base")
 		mjblood = modelFloat(hero, "affairs_base")

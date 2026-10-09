@@ -50,6 +50,8 @@ func main() {
 		"migrations/0009_m5_armor.sql",
 		"migrations/0010_m6_economy.sql",
 		"migrations/0011_m7_battle.sql",
+		"migrations/0012_m8_task.sql",
+		"migrations/0013_m9_activity.sql",
 		"migrations/0004_seed_normalized.sql",
 	}
 	for _, f := range files {
@@ -151,7 +153,11 @@ func report(db *sql.DB) error {
 		"cfg_strong_probability", "cfg_xilian", "cfg_xilian_type", "cfg_armor_level_attr",
 		"cfg_armor_hole_rule", "cfg_tie", "cfg_tie_attribute", "user_tie_deify_attribute",
 		"things", "log_things", "log_armor_strong", "log_armor_combine", "log_selled_armor", "log_armor",
-		"battles", "battle_rounds", "battle_tactics", "cfg_defence", "bak_troops", "city_wounded", "city_defences"}
+		"battles", "battle_rounds", "battle_tactics", "cfg_defence", "bak_troops", "city_wounded", "city_defences",
+		"cfg_task_groups", "cfg_tasks", "cfg_task_goals", "cfg_task_rewards", "user_tasks", "user_goals",
+		"cfg_achivement_groups", "cfg_achivements", "cfg_achivement_goals", "cfg_achivement_goal_mappings", "user_achivements",
+		"log_lottery", "mem_lottery_goods",
+		"cfg_pk_battle", "cfg_pk_level", "cfg_pk_hero", "cfg_pk_reward", "cfg_pk_first", "sys_pk_user"}
 	for _, t := range tables {
 		var n int64
 		if err := db.QueryRow("select count(*) from `" + t + "`").Scan(&n); err != nil {

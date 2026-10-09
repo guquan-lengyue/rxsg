@@ -174,7 +174,17 @@ func (f *Fixture) Cleanup() {
 		{"delete from log_action_counts where user_id=?", true},
 		{"delete from reports where user_id=?", true},
 		{"delete from alarms where user_id=?", true},
+		// M8 任务/成就
+		{"delete from user_goals where uid=?", true},
+		{"delete from user_tasks where uid=?", true},
+		{"delete from user_achivements where uid=?", true},
+		{"delete from user_systask_num where user_id=?", true},
+		{"delete from user_schedule where user_id=?", true},
 		{"delete from user_buffers where user_id=?", true},
+		// M9 单机活动（抽奖 / PK 征战）
+		{"delete from log_lottery where uid=?", true},
+		{"delete from mem_lottery_goods where uid=?", true},
+		{"delete from sys_pk_user where uid=?", true},
 		{"delete from city_schedule where city_id=?", false},
 		{"delete from city_res_add where city_id=?", false},
 		// M7 战斗（先删引用 battles 的子表，再删 battles 本体）
@@ -200,5 +210,7 @@ func (f *Fixture) Cleanup() {
 	}
 	_, _ = d.Exec(ctx, "delete from city_trades where cid=? or buycid=?", f.CID, f.CID)
 	_, _ = d.Exec(ctx, "delete from tickets where user_id=? or binduid=?", f.UID, f.UID)
+	// M9：cfg_pk_first 为共享配置行（uid=0 表示空缺），测试占位后复位而非删除。
+	_, _ = d.Exec(ctx, "update cfg_pk_first set uid=0, passtime=0, time=0 where uid=?", f.UID)
 	_, _ = d.Exec(ctx, "delete from users where id=?", f.UID)
 }

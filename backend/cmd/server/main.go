@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"rxsg/backend/internal/achievement"
 	"rxsg/backend/internal/armor"
 	"rxsg/backend/internal/army"
 	"rxsg/backend/internal/auth"
@@ -18,7 +19,10 @@ import (
 	"rxsg/backend/internal/economy"
 	"rxsg/backend/internal/goods"
 	"rxsg/backend/internal/hero"
+	"rxsg/backend/internal/lottery"
 	"rxsg/backend/internal/middleware"
+	"rxsg/backend/internal/pk"
+	"rxsg/backend/internal/task"
 	"rxsg/backend/internal/tavern"
 	"rxsg/backend/internal/technic"
 )
@@ -54,6 +58,10 @@ func main() {
 	tavernHandler := tavern.NewHandler(tavern.NewService(database))
 	armorHandler := armor.NewHandler(armor.NewService(database))
 	economyHandler := economy.NewHandler(economy.NewService(database, buildingSvc))
+	taskHandler := task.NewHandler(task.NewService(database))
+	achievementHandler := achievement.NewHandler(achievement.NewService(database))
+	lotteryHandler := lottery.NewHandler(lottery.NewService(database))
+	pkHandler := pk.NewHandler(pk.NewService(database))
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -81,6 +89,10 @@ func main() {
 	tavernHandler.Register(protected)
 	armorHandler.Register(protected)
 	economyHandler.Register(protected)
+	taskHandler.Register(protected)
+	achievementHandler.Register(protected)
+	lotteryHandler.Register(protected)
+	pkHandler.Register(protected)
 
 	addr := ":" + strconv.Itoa(cfg.Server.Port)
 	log.Printf("rxsg backend 启动于 %s", addr)
