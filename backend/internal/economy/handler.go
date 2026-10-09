@@ -432,8 +432,11 @@ func (h *Handler) storePack(c *gin.Context) {
 // ── 工匠作坊 ────────────────────────────────────────────────────────────
 
 func (h *Handler) workshopInfo(c *gin.Context) {
-	cid, ok := cidOf(c)
-	if !ok {
+	// legacy loadInitWorkShopInfo($uid,$param)：cid 为首个客户端入参（同 refresh/buy 的 body.cid），
+	// 非路径参数；此处 GET 用 ?cid= 承接（原实现误用 cidOf 路径参数，见 0010/M6）。
+	cid, err := strconv.Atoi(c.Query("cid"))
+	if err != nil || cid <= 0 {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
 		return
 	}
 	out, err := h.svc.LoadInitWorkShopInfo(c.Request.Context(), uidOf(c), cid)
