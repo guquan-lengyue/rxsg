@@ -14,6 +14,7 @@ import type {
   Field,
   Hero,
   HeroInfo,
+  HotelInfo,
   March,
   Technic,
   TechnicInfo,
@@ -165,12 +166,71 @@ export async function upgradeHero(cid: number, hid: number): Promise<HeroInfo> {
   return data
 }
 
-export async function startHeroExpr(cid: number, hid: number, hours: number): Promise<HeroInfo> {
-  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/expr/start`, { hid, hours })
+export async function startHeroExpr(
+  cid: number,
+  hid: number,
+  exprType: number,
+  hours: number,
+  carrymoney: number,
+): Promise<HeroInfo> {
+  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/expr/start`, {
+    hid,
+    exprType,
+    hours,
+    carrymoney,
+  })
   return data
 }
 
 export async function cancelHeroExpr(cid: number, hid: number): Promise<HeroInfo> {
   const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/expr/cancel`, { hid })
+  return data
+}
+
+export async function fasterHeroExpr(cid: number, hid: number): Promise<HeroInfo> {
+  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/expr/faster`, { hid })
+  return data
+}
+
+export async function addHeroPoint(
+  cid: number,
+  hid: number,
+  affairs: number,
+  bravery: number,
+  wisdom: number,
+): Promise<HeroInfo> {
+  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/point/add`, {
+    hid,
+    affairs,
+    bravery,
+    wisdom,
+  })
+  return data
+}
+
+export async function clearHeroPoint(cid: number, hid: number): Promise<HeroInfo> {
+  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/point/clear`, { hid })
+  return data
+}
+
+export async function setHeroOffice(cid: number, sets: [number, number][]): Promise<HeroInfo> {
+  const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/office`, { sets })
+  return data
+}
+
+// —— 客栈：招募池 / 招募 / 招贤榜重置 ——
+
+export async function getHotelInfo(cid: number): Promise<HotelInfo> {
+  const { data } = await http.get<HotelInfo>(`/cities/${cid}/hotel/info`)
+  return data
+}
+
+export async function recruitHero(cid: number, id: number): Promise<HotelInfo> {
+  const { data } = await http.post<HotelInfo>(`/cities/${cid}/hotel/recruit`, { id })
+  return data
+}
+
+export async function resetHotel(cid: number): Promise<HotelInfo> {
+  const { data } = await http.post<HotelInfo>(`/cities/${cid}/hotel/reset`)
   return data
 }

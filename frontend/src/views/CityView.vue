@@ -5,11 +5,15 @@ import { useRoute, useRouter } from 'vue-router'
 import BuildingGrid from '@/components/BuildingGrid.vue'
 import BuildingPanel from '@/components/BuildingPanel.vue'
 import ArmyPanel from '@/components/ArmyPanel.vue'
+import ArmorPanel from '@/components/ArmorPanel.vue'
 import HeroPanel from '@/components/HeroPanel.vue'
+import HotelPanel from '@/components/HotelPanel.vue'
 import ResourceBar from '@/components/ResourceBar.vue'
 import TechnicPanel from '@/components/TechnicPanel.vue'
 import { errorMessage } from '@/api/http'
+import type { StrongPayload } from '@/api/armor'
 import { zhCN } from '@/lang/zh-CN'
+import { useArmorStore } from '@/stores/armor'
 import { useAuthStore } from '@/stores/auth'
 import { useCityStore } from '@/stores/city'
 import type { Building, BuildingDetail, DispatchPayload } from '@/types'
@@ -18,6 +22,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const city = useCityStore()
+const armor = useArmorStore()
 
 const loading = ref(false)
 const error = ref('')
@@ -241,14 +246,19 @@ async function onHeroUpgrade(hid: number): Promise<void> {
   }
 }
 
-async function onHeroStartExpr(hid: number, hours: number): Promise<void> {
+async function onHeroStartExpr(
+  hid: number,
+  exprType: number,
+  hours: number,
+  carrymoney: number,
+): Promise<void> {
   if (!activeCid.value) {
     return
   }
   heroBusy.value = true
   heroError.value = ''
   try {
-    await city.startHeroExpr(activeCid.value, hid, hours)
+    await city.startHeroExpr(activeCid.value, hid, exprType, hours, carrymoney)
   } catch (e) {
     heroError.value = errorMessage(e)
   } finally {
@@ -271,8 +281,209 @@ async function onHeroCancelExpr(hid: number): Promise<void> {
   }
 }
 
+async function onHeroFasterExpr(hid: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  heroBusy.value = true
+  heroError.value = ''
+  try {
+    await city.fasterHeroExpr(activeCid.value, hid)
+  } catch (e) {
+    heroError.value = errorMessage(e)
+  } finally {
+    heroBusy.value = false
+  }
+}
+
+async function onHeroAddPoint(hid: number, affairs: number, bravery: number, wisdom: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  heroBusy.value = true
+  heroError.value = ''
+  try {
+    await city.addHeroPoint(activeCid.value, hid, affairs, bravery, wisdom)
+  } catch (e) {
+    heroError.value = errorMessage(e)
+  } finally {
+    heroBusy.value = false
+  }
+}
+
+async function onHeroClearPoint(hid: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  heroBusy.value = true
+  heroError.value = ''
+  try {
+    await city.clearHeroPoint(activeCid.value, hid)
+  } catch (e) {
+    heroError.value = errorMessage(e)
+  } finally {
+    heroBusy.value = false
+  }
+}
+
+// 客栈面板状态
+const showHotel = ref(false)
+const hotelLoading = ref(false)
+const hotelError = ref('')
+const hotelBusy = ref(false)
+
+async function openHotel(): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  showHotel.value = true
+  hotelError.value = ''
+  hotelLoading.value = true
+  try {
+    await city.loadHotelInfo(activeCid.value)
+  } catch (e) {
+    hotelError.value = errorMessage(e)
+  } finally {
+    hotelLoading.value = false
+  }
+}
+
+function closeHotel(): void {
+  showHotel.value = false
+  hotelError.value = ''
+  hotelBusy.value = false
+}
+
+async function onHotelRecruit(id: number): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  hotelBusy.value = true
+  hotelError.value = ''
+  try {
+    await city.recruitHero(activeCid.value, id)
+  } catch (e) {
+    hotelError.value = errorMessage(e)
+  } finally {
+    hotelBusy.value = false
+  }
+}
+
+async function onHotelReset(): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  hotelBusy.value = true
+  hotelError.value = ''
+  try {
+    await city.resetHotel(activeCid.value)
+  } catch (e) {
+    hotelError.value = errorMessage(e)
+  } finally {
+    hotelBusy.value = false
+  }
+}
+
+// 装备面板状态
+const showArmor = ref(false)
+const armorLoading = ref(false)
+const armorError = ref('')
+const armorBusy = ref(false)
+
+async function openArmor(): Promise<void> {
+  showArmor.value = true
+  armorError.value = ''
+  armorLoading.value = true
+  try {
+    await Promise.all([
+      armor.loadBag(),
+      city.heroInfo ? Promise.resolve() : activeCid.value ? city.loadHeroInfo(activeCid.value) : Promise.resolve(),
+    ])
+  } catch (e) {
+    armorError.value = errorMessage(e)
+  } finally {
+    armorLoading.value = false
+  }
+}
+
+function closeArmor(): void {
+  showArmor.value = false
+  armorError.value = ''
+  armorBusy.value = false
+}
+
+async function runArmor(fn: () => Promise<unknown>): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  armorBusy.value = true
+  armorError.value = ''
+  try {
+    await fn()
+    // 修复/出售等扣城金，同步刷新资源
+    await city.refreshResources(activeCid.value)
+  } catch (e) {
+    armorError.value = errorMessage(e)
+  } finally {
+    armorBusy.value = false
+  }
+}
+
+function onArmorEquip(hid: number, sid: number, spart: number): void {
+  void runArmor(() => armor.equip(hid, sid, spart))
+}
+
+function onArmorOffload(hid: number, spart: number): void {
+  void runArmor(() => armor.offload(hid, spart))
+}
+
+function onArmorRepair(sid: number): void {
+  void runArmor(() => armor.repair(activeCid.value, sid))
+}
+
+function onArmorRenovate(sid: number): void {
+  void runArmor(() => armor.renovate(sid))
+}
+
+function onArmorSell(sid: number): void {
+  void runArmor(() => armor.sell(activeCid.value, sid))
+}
+
+function onArmorChaijie(sid: number): void {
+  void runArmor(() => armor.chaijie(sid))
+}
+
+function onArmorStrong(p: StrongPayload): void {
+  void runArmor(() => armor.strong(p))
+}
+
+function onArmorCombine(mainSid: number, sub1: number, sub2: number, goodsFlag: number): void {
+  void runArmor(() => armor.combine(mainSid, 1, sub1, sub2, goodsFlag))
+}
+
+function onArmorInitHoles(sid: number): void {
+  void runArmor(() => armor.initHoles(activeCid.value, sid))
+}
+
+function onArmorOpenHole(sid: number, gid: number, pos: number, useType: number, count: number): void {
+  void runArmor(() => armor.openHole(sid, gid, pos, useType, count))
+}
+
+function onArmorEmbed(sid: number, pos: number, gid: number): void {
+  void runArmor(() => armor.embed(sid, pos, gid, 0))
+}
+
+function onArmorLoadHero(hid: number): void {
+  void runArmor(() => armor.loadHeroArmors(hid))
+}
+
 async function selectBuilding(b: Building): Promise<void> {
   if (!activeCid.value) {
+    return
+  }
+  // 原版点击客栈建筑直接进入招贤馆（bid=12 为扩展槽位，legacy HOTEL=10 与校场冲突）。
+  if (b.bid === 12) {
+    await openHotel()
     return
   }
   selected.value = b
@@ -357,6 +568,7 @@ async function enterCity(cid: number): Promise<void> {
   closeTechnics()
   closeArmy()
   closeHeroes()
+  closeHotel()
   try {
     if (!city.cities.length) {
       await city.loadCities()
@@ -422,6 +634,7 @@ onBeforeUnmount(() => {
         <button class="nav-tech" type="button" @click="openTechnics">{{ zhCN.technic.open }}</button>
         <button class="nav-btn army" type="button" title="军事" @click="openArmy"></button>
         <button class="nav-btn hero" type="button" title="武将" @click="openHeroes"></button>
+        <button class="nav-armor" type="button" @click="openArmor">{{ zhCN.armor.open }}</button>
         <span class="user">{{ auth.user?.name || auth.user?.passport }}</span>
         <button class="logout" @click="onLogout">{{ zhCN.city.logout }}</button>
       </div>
@@ -488,9 +701,49 @@ onBeforeUnmount(() => {
       :error="heroError"
       :busy="heroBusy"
       @upgrade="onHeroUpgrade"
+      @add-point="onHeroAddPoint"
+      @clear-point="onHeroClearPoint"
       @start-expr="onHeroStartExpr"
       @cancel-expr="onHeroCancelExpr"
+      @faster-expr="onHeroFasterExpr"
       @close="closeHeroes"
+    />
+
+    <HotelPanel
+      v-if="showHotel"
+      :info="city.hotelInfo"
+      :loading="hotelLoading"
+      :error="hotelError"
+      :busy="hotelBusy"
+      :gold="city.resources?.gold ?? 0"
+      @recruit="onHotelRecruit"
+      @reset="onHotelReset"
+      @close="closeHotel"
+    />
+
+    <ArmorPanel
+      v-if="showArmor"
+      :bag="armor.bag"
+      :heroes="city.heroInfo?.heroes ?? []"
+      :hero-armors="armor.heroArmors"
+      :cid="activeCid"
+      :gold="city.resources?.gold ?? 0"
+      :loading="armorLoading"
+      :error="armorError"
+      :busy="armorBusy"
+      @equip="onArmorEquip"
+      @offload="onArmorOffload"
+      @repair="onArmorRepair"
+      @renovate="onArmorRenovate"
+      @sell="onArmorSell"
+      @chaijie="onArmorChaijie"
+      @strong="onArmorStrong"
+      @combine="onArmorCombine"
+      @init-holes="onArmorInitHoles"
+      @open-hole="onArmorOpenHole"
+      @embed="onArmorEmbed"
+      @load-hero="onArmorLoadHero"
+      @close="closeArmor"
     />
   </div>
 </template>
@@ -601,6 +854,26 @@ select {
   border: 1px solid #6d582f;
   border-radius: 3px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* 装备：同科技按钮样式（原版装备入口在武将面板内，此处为独立入口） */
+.nav-armor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  color: #f0e3c2;
+  background: linear-gradient(180deg, #4c3b24, #2c2116);
+  border: 1px solid #6d582f;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.nav-armor:hover {
+  color: #ffe9a8;
+  border-color: var(--accent);
 }
 
 .nav-tech::before {

@@ -7,14 +7,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"rxsg/backend/internal/armor"
 	"rxsg/backend/internal/army"
 	"rxsg/backend/internal/auth"
 	"rxsg/backend/internal/building"
 	"rxsg/backend/internal/city"
 	"rxsg/backend/internal/config"
 	"rxsg/backend/internal/db"
+	"rxsg/backend/internal/economy"
+	"rxsg/backend/internal/goods"
 	"rxsg/backend/internal/hero"
 	"rxsg/backend/internal/middleware"
+	"rxsg/backend/internal/tavern"
 	"rxsg/backend/internal/technic"
 )
 
@@ -43,6 +47,10 @@ func main() {
 	armyHandler := army.NewHandler(army.NewService(database))
 	heroHandler := hero.NewHandler(hero.NewService(database))
 	cityHandler := city.NewHandler(city.NewService(database, buildingSvc))
+	goodsHandler := goods.NewHandler(goods.NewService(database))
+	tavernHandler := tavern.NewHandler(tavern.NewService(database))
+	armorHandler := armor.NewHandler(armor.NewService(database))
+	economyHandler := economy.NewHandler(economy.NewService(database, buildingSvc))
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -65,6 +73,10 @@ func main() {
 	technicHandler.Register(protected)
 	armyHandler.Register(protected)
 	heroHandler.Register(protected)
+	goodsHandler.Register(protected)
+	tavernHandler.Register(protected)
+	armorHandler.Register(protected)
+	economyHandler.Register(protected)
 
 	addr := ":" + strconv.Itoa(cfg.Server.Port)
 	log.Printf("rxsg backend 启动于 %s", addr)

@@ -40,6 +40,7 @@ const BUILDING_TEXTURES: Record<number, string> = {
   8: 'inbuilding_barrack.png', // 兵营
   9: 'inbuilding_barn.png', // 仓库（谷仓）
   10: 'inbuilding_forceyard.png', // 校场
+  12: 'inbuilding_hotel.png', // 客栈（扩展槽位 12，legacy HOTEL=10 与校场冲突）
 }
 export function buildingIntro(bid: number): string {
   return img(BUILDING_TEXTURES[bid] ?? `building_intro_${bid}.png`)

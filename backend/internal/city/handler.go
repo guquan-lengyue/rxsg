@@ -27,6 +27,91 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	g.GET("/:cid/defences", h.defences)
 	g.GET("/:cid/heroes", h.heroes)
 	g.GET("/:cid/alarms", h.alarms)
+
+	// M1 城市内政（CityFunc.php changeTax/levyResource/pacifyPeople/getCityProduct）
+	g.POST("/:cid/tax", h.tax)
+	g.POST("/:cid/levy", h.levy)
+	g.POST("/:cid/pacify", h.pacify)
+	g.GET("/:cid/product", h.product)
+}
+
+type taxReq struct {
+	Tax int `json:"tax"`
+}
+
+type levyReq struct {
+	ResID int `json:"resid"`
+}
+
+type pacifyReq struct {
+	Action int `json:"action"`
+}
+
+func (h *Handler) tax(c *gin.Context) {
+	cid, ok := cidParam(c)
+	if !ok {
+		return
+	}
+	var req taxReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	res, err := h.svc.ChangeTax(c.Request.Context(), c.GetInt(auth.CtxUID), cid, req.Tax)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, res)
+}
+
+func (h *Handler) levy(c *gin.Context) {
+	cid, ok := cidParam(c)
+	if !ok {
+		return
+	}
+	var req levyReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	msg, res, err := h.svc.LevyResource(c.Request.Context(), c.GetInt(auth.CtxUID), cid, req.ResID)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"message": msg, "resource": res})
+}
+
+func (h *Handler) pacify(c *gin.Context) {
+	cid, ok := cidParam(c)
+	if !ok {
+		return
+	}
+	var req pacifyReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	msg, res, err := h.svc.PacifyPeople(c.Request.Context(), c.GetInt(auth.CtxUID), cid, req.Action)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"message": msg, "resource": res})
+}
+
+func (h *Handler) product(c *gin.Context) {
+	cid, ok := cidParam(c)
+	if !ok {
+		return
+	}
+	p, err := h.svc.GetCityProduct(c.Request.Context(), c.GetInt(auth.CtxUID), cid)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, p)
 }
 
 // cidParam 解析并校验路径中的 cid。

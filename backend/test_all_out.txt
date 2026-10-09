@@ -1,0 +1,8 @@
+﻿
+ok  	rxsg/backend/internal/armor	101.330s
+ok  	rxsg/backend/internal/city	40.570s
+ok  	rxsg/backend/internal/goods	154.360s
+ok  	rxsg/backend/internal/hero	83.800s
+ok  	rxsg/backend/internal/tavern	69.953s
+
+

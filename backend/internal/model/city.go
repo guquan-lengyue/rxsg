@@ -43,6 +43,7 @@ type CityResource struct {
 	PeopleWorking  int64 `json:"peopleWorking"`
 	PeopleBuilding int64 `json:"peopleBuilding"`
 	Morale         int   `json:"morale"`
+	MoraleStable   int   `json:"moraleStable"`
 	Tax            int   `json:"tax"`
 	Complaint      int   `json:"complaint"`
 	HeroFee        int64 `json:"heroFee"`
@@ -52,23 +53,27 @@ type CityResource struct {
 
 func CityResourceFromMap(m map[string]any) CityResource {
 	return CityResource{
-		CID:            Int(m, "city_id"),
-		Wood:           Int64(m, "wood"),
-		WoodMax:        Int64(m, "wood_max"),
-		Rock:           Int64(m, "rock"),
-		RockMax:        Int64(m, "rock_max"),
-		Iron:           Int64(m, "iron"),
-		IronMax:        Int64(m, "iron_max"),
-		Food:           Int64(m, "food"),
-		FoodMax:        Int64(m, "food_max"),
-		Gold:           Int64(m, "gold"),
-		GoldMax:        Int64(m, "gold_max"),
-		People:         Int64(m, "people"),
-		PeopleMax:      Int64(m, "people_max"),
-		Morale:         Int(m, "morale"),
-		Tax:            Int(m, "tax"),
-		Complaint:      Int(m, "complaint"),
-		Vacation:       Int(m, "vacation"),
+		CID:          Int(m, "city_id"),
+		Wood:         Int64(m, "wood"),
+		WoodMax:      Int64(m, "wood_max"),
+		Rock:         Int64(m, "rock"),
+		RockMax:      Int64(m, "rock_max"),
+		Iron:         Int64(m, "iron"),
+		IronMax:      Int64(m, "iron_max"),
+		Food:         Int64(m, "food"),
+		FoodMax:      Int64(m, "food_max"),
+		Gold:         Int64(m, "gold"),
+		GoldRate:     Int(m, "gold_rate"),
+		GoldMax:      Int64(m, "gold_max"),
+		People:       Int64(m, "people"),
+		PeopleMax:    Int64(m, "people_max"),
+		PeopleStable: Int64(m, "people_stable"),
+		FoodArmyUse:  Int64(m, "food_army_use"),
+		Morale:       Int(m, "morale"),
+		MoraleStable: Int(m, "morale_stable"),
+		Tax:          Int(m, "tax"),
+		Complaint:    Int(m, "complaint"),
+		Vacation:     Int(m, "vacation"),
 	}
 }
 

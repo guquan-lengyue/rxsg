@@ -12,6 +12,7 @@ import type {
   DispatchPayload,
   Field,
   HeroInfo,
+  HotelInfo,
   March,
   TechnicInfo,
 } from '@/types'
@@ -30,6 +31,7 @@ export const useCityStore = defineStore('city', () => {
   const fields = ref<Field[]>([])
   const marches = ref<March[]>([])
   const heroInfo = ref<HeroInfo | null>(null)
+  const hotelInfo = ref<HotelInfo | null>(null)
 
   let timer: ReturnType<typeof setInterval> | null = null
 
@@ -49,6 +51,7 @@ export const useCityStore = defineStore('city', () => {
     fields.value = []
     marches.value = []
     heroInfo.value = null
+    hotelInfo.value = null
     return d
   }
 
@@ -172,14 +175,69 @@ export const useCityStore = defineStore('city', () => {
     return heroInfo.value
   }
 
-  async function startHeroExpr(cid: number, hid: number, hours: number): Promise<HeroInfo> {
-    heroInfo.value = await cityApi.startHeroExpr(cid, hid, hours)
+  async function startHeroExpr(
+    cid: number,
+    hid: number,
+    exprType: number,
+    hours: number,
+    carrymoney: number,
+  ): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.startHeroExpr(cid, hid, exprType, hours, carrymoney)
     return heroInfo.value
   }
 
   async function cancelHeroExpr(cid: number, hid: number): Promise<HeroInfo> {
     heroInfo.value = await cityApi.cancelHeroExpr(cid, hid)
     return heroInfo.value
+  }
+
+  async function fasterHeroExpr(cid: number, hid: number): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.fasterHeroExpr(cid, hid)
+    return heroInfo.value
+  }
+
+  async function addHeroPoint(
+    cid: number,
+    hid: number,
+    affairs: number,
+    bravery: number,
+    wisdom: number,
+  ): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.addHeroPoint(cid, hid, affairs, bravery, wisdom)
+    return heroInfo.value
+  }
+
+  async function clearHeroPoint(cid: number, hid: number): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.clearHeroPoint(cid, hid)
+    return heroInfo.value
+  }
+
+  async function setHeroOffice(cid: number, sets: [number, number][]): Promise<HeroInfo> {
+    heroInfo.value = await cityApi.setHeroOffice(cid, sets)
+    return heroInfo.value
+  }
+
+  // —— 客栈：招募池 / 招募 / 招贤榜重置 ——
+
+  async function loadHotelInfo(cid: number): Promise<HotelInfo> {
+    hotelInfo.value = await cityApi.getHotelInfo(cid)
+    return hotelInfo.value
+  }
+
+  // 招募扣城金并入城武将：同步刷新资源、武将列表与酒店信息。
+  async function recruitHero(cid: number, id: number): Promise<HotelInfo> {
+    hotelInfo.value = await cityApi.recruitHero(cid, id)
+    resources.value = await cityApi.getResources(cid)
+    if (heroInfo.value) {
+      await loadHeroInfo(cid)
+    }
+    return hotelInfo.value
+  }
+
+  // 招贤榜重置消耗道具（元宝侧），刷新酒店信息即可（池全量重建）。
+  async function resetHotel(cid: number): Promise<HotelInfo> {
+    hotelInfo.value = await cityApi.resetHotel(cid)
+    return hotelInfo.value
   }
 
   function startHeartbeat(cid: number): void {
@@ -200,6 +258,10 @@ export const useCityStore = defineStore('city', () => {
       // 武将面板打开过才刷新（历练到期靠惰性结算推进）。
       if (heroInfo.value) {
         void loadHeroInfo(cid)
+      }
+      // 客栈面板打开过才刷新（招募池按刷新块惰性重建）。
+      if (hotelInfo.value) {
+        void loadHotelInfo(cid)
       }
     }, HEARTBEAT_MS)
   }
@@ -222,6 +284,7 @@ export const useCityStore = defineStore('city', () => {
     fields,
     marches,
     heroInfo,
+    hotelInfo,
     loadCities,
     loadCity,
     refreshResources,
@@ -244,6 +307,13 @@ export const useCityStore = defineStore('city', () => {
     upgradeHero,
     startHeroExpr,
     cancelHeroExpr,
+    fasterHeroExpr,
+    addHeroPoint,
+    clearHeroPoint,
+    setHeroOffice,
+    loadHotelInfo,
+    recruitHero,
+    resetHotel,
     startHeartbeat,
     stopHeartbeat,
   }

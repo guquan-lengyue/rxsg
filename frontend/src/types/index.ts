@@ -169,16 +169,18 @@ export interface Hero {
   curCid: number
 }
 
-// 武将面板（对齐后端 hero 包 DTO）。
+// 武将面板（对齐后端 hero 包 DTO，state 采用 legacy 值集 {0,1,4,7,8,10,11}）。
 export interface HeroExpr {
   id: number
   expr_type: number
+  expr_name: string
   hours: number
   state: number
   started_at: number
   end_at: number
   time_left: number
-  exp_gain: number
+  carrymoney: number
+  acc_times: number
 }
 
 export interface HeroExprType {
@@ -186,7 +188,8 @@ export interface HeroExprType {
   name: string
   min_hour: number
   max_hour: number
-  exp_per_hour: number
+  hour_money: number
+  hour_gold: number
 }
 
 export interface HeroState {
@@ -195,18 +198,23 @@ export interface HeroState {
   sex: number
   face: number
   hero_type: number
+  npc_id: number
   level: number
   exp: number
   state: number
   loyalty: number
   hero_health: number
   command_base: number
+  command_add_on: number
   bravery_base: number
   bravery_add: number
+  bravery_add_on: number
   wisdom_base: number
   wisdom_add: number
+  wisdom_add_on: number
   affairs_base: number
   affairs_add: number
+  affairs_add_on: number
   attack_base: number
   attack_add_on: number
   defence_base: number
@@ -222,6 +230,7 @@ export interface HeroState {
 export interface HeroInfo {
   heroes: HeroState[]
   exprTypes: HeroExprType[]
+  toomany?: string
 }
 
 export interface Province {
@@ -316,6 +325,36 @@ export interface BaseInfo {
   openLottery: number
 }
 
+// 客栈招募池（对齐后端 tavern 包 DTO；sex 沿用 legacy：0=女 1=男）。
+export interface Recruit {
+  id: number
+  name: string
+  sex: number
+  face: number
+  level: number
+  affairs_base: number
+  bravery_base: number
+  wisdom_base: number
+  command_base: number
+  affairs_add: number
+  bravery_add: number
+  wisdom_add: number
+  command_add: number
+  loyalty: number
+  gold_need: number
+  hero_type: number
+  is_act_hero: boolean
+}
+
+export interface HotelInfo {
+  hotel_level: number
+  hotel_name: string
+  office_pos: number
+  can_jiejiao: boolean
+  recruits: Recruit[]
+  tip?: string
+}
+
 export interface CityDetail {
   city: City
   base: BaseInfo
@@ -337,4 +376,74 @@ export interface LoginAnnouncement {
 export interface APIError {
   code: string
   message: string
+}
+
+// —— 装备（对齐后端 armor 包 DTO）——
+
+export interface BagArmor {
+  sid: number
+  armorid: number
+  name: string
+  part: number
+  type: number
+  hero_level: number
+  value: number
+  hp: number
+  hp_max: number
+  ori_hp_max: number
+  hid: number
+  strong_level: number
+  strong_value: number
+  strong_times: number
+  combine_level: number
+  embed_holes: string
+  embed_pearls: string
+  best_quality: string
+  deified: number
+  active_special: number
+  attribute: string
+  tieid: number
+  description: string
+}
+
+export interface HeroArmorItem {
+  sid: number
+  spart: number
+  armorid: number
+  name: string
+  part: number
+  type: number
+}
+
+export interface EquipResult {
+  hid: number
+  command_add_on: number
+  affairs_add_on: number
+  bravery_add_on: number
+  wisdom_add_on: number
+  speed_add_on: number
+  attack_add_on: number
+  defence_add_on: number
+  armors: HeroArmorItem[]
+}
+
+export interface StrongResult {
+  started: boolean
+  outcome: number // 0成功 1归零 2降级 3完好/无损
+  strong_value: number
+  end_level: number
+  best_quality: string
+  msg: string
+}
+
+export interface CombineResult {
+  success: number
+  goods_flag: number
+  new_combine_level: number
+}
+
+export interface EmbedResult {
+  started: number
+  msg: string
+  pearls: string
 }

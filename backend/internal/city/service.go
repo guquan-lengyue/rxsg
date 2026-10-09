@@ -7,15 +7,19 @@ import (
 	"rxsg/backend/internal/building"
 	"rxsg/backend/internal/db"
 	"rxsg/backend/internal/httpx"
+	"rxsg/backend/internal/lock"
 	"rxsg/backend/internal/model"
 )
 
 type Service struct {
 	db  *db.DB
 	bld *building.Service
+	lk  *lock.Locker
 }
 
-func NewService(d *db.DB, bld *building.Service) *Service { return &Service{db: d, bld: bld} }
+func NewService(d *db.DB, bld *building.Service) *Service {
+	return &Service{db: d, bld: bld, lk: lock.New(d.DB)}
+}
 
 // CityDetail 对齐 doGetCityAllInfo（utils.php:846）的返回顺序：
 // [城市, 基础信息, 建筑, 科技, 州郡]。
@@ -75,6 +79,11 @@ func (s *Service) GetCityDetail(ctx context.Context, uid, cid int) (*CityDetail,
 		return nil, err
 	}
 	city := model.CityFromMap(cityRow)
+
+	// 对齐 legacy doGetCityAllInfo：进城时记 lastcid（道具类 addCityResources 的目标城）。
+	if _, err := s.db.Exec(ctx, "update users set lastcid=? where id=?", cid, uid); err != nil {
+		return nil, err
+	}
 
 	base, err := s.BaseInfo(ctx, uid, cid)
 	if err != nil {
