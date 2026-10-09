@@ -177,6 +177,13 @@ func (f *Fixture) Cleanup() {
 		{"delete from user_buffers where user_id=?", true},
 		{"delete from city_schedule where city_id=?", false},
 		{"delete from city_res_add where city_id=?", false},
+		// M7 战斗（先删引用 battles 的子表，再删 battles 本体）
+		{"delete from battle_rounds where battleid in (select id from battles where attackuid=? or resistuid=?)", true},
+		{"delete from battle_tactics where battleid in (select id from battles where attackuid=? or resistuid=?)", true},
+		{"delete from bak_troops where uid=?", true},
+		{"delete from battles where attackuid=? or resistuid=?", true},
+		{"delete from city_wounded where city_id=?", false},
+		{"delete from city_defences where city_id=?", false},
 		{"delete from city_resources where city_id=?", false},
 		{"delete from city_technics where city_id=?", false},
 		{"delete from buildings where city_id=?", false},

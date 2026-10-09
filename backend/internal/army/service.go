@@ -4,12 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"math"
-	"sort"
 	"strconv"
-	"strings"
 
+	"rxsg/backend/internal/battle"
 	"rxsg/backend/internal/db"
 	"rxsg/backend/internal/game"
 	"rxsg/backend/internal/httpx"
@@ -17,17 +15,18 @@ import (
 )
 
 // Service 复刻 legacy SoldierFunc.php / TroopFunc.php 的征兵与部队逻辑，并适配新库
-// draft_queue/city_soldiers/troops/fields/battle_reports 表。
+// draft_queue/city_soldiers/troops/fields 表。
 //
 // 与 legacy 的差异（新库简化）：
 //   - 无世界地图坐标，行军路程改用固定距离常量 marchDistance 折算，时间再按 GAME_SPEED_RATE 缩放。
 //   - 无 cfg_book/sys_user_book/符/特殊兵种/器械表，相关加成省略。
-//   - 战斗结算采用简化模型（战力对比 + 按比例伤亡），详见 resolveBattle。
+//   - 战斗结算改用 battle 包的 OLdBattleCron 回合引擎（1:1 复刻），详见 battle 包。
 type Service struct {
-	db *db.DB
+	db     *db.DB
+	battle *battle.Service
 }
 
-func NewService(d *db.DB) *Service { return &Service{db: d} }
+func NewService(d *db.DB, b *battle.Service) *Service { return &Service{db: d, battle: b} }
 
 // barracksBID 兵营建筑 ID（cfg_buildings: 8兵营）。
 const barracksBID = 8
@@ -937,7 +936,7 @@ func (s *Service) SettleMarches(ctx context.Context, uid, cid int) error {
 	if err != nil {
 		return err
 	}
-	// 1) 到达前线：执行战斗结算。
+	// 1) 到达前线：建立战斗（legacy cfg_js.php 抵达分支 → mem_battle 落库）。
 	for i := 0; i < 50; i++ {
 		row, err := s.db.FetchOne(ctx,
 			"select * from troops where city_id=? and state=? and arrive_at>0 and arrive_at<=? order by id limit 1",
@@ -948,7 +947,22 @@ func (s *Service) SettleMarches(ctx context.Context, uid, cid int) error {
 		if err != nil {
 			return err
 		}
-		if err := s.resolveBattle(ctx, uid, cid, row, now); err != nil {
+		troopID := model.Int(row, "id")
+		bid, err := s.battle.StartBattleForTroop(ctx, troopID)
+		if err != nil {
+			return err
+		}
+		if bid == 0 {
+			// 目标已消失：直接返程（对齐 legacy 目标不存在分支）。
+			survivors := decodeSoldiers(model.Str(row, "soldiers"))
+			if err := s.beginReturn(ctx, troopID, survivors, now, s.marchSeconds(ctx, survivors)); err != nil {
+				return err
+			}
+		}
+	}
+	// 1b) 推进与 uid 相关的在战回合（legacy HandleBattle 惰性化）。
+	if s.battle != nil {
+		if _, err := s.battle.SettleForUser(ctx, uid); err != nil {
 			return err
 		}
 	}
@@ -994,239 +1008,6 @@ func (s *Service) addSoldiersToCity(ctx context.Context, cid int, soldiers map[i
 	return nil
 }
 
-// resolveBattle 简化战斗模型（战力口径与 battle_reports 种子数据一致）：
-//   - 进攻战力 = Σ 兵力×ap + 武将(attack_base + attack_add_on)
-//   - 防守战力 = 野地 guard_power + Σ guardSoldiers×dp；玩家城 Σ city_soldiers×dp
-//   - 进攻战力 >= 防守战力 判胜（result=1 大获全胜，否则 0 铩羽而归）。
-//   - 伤亡为简化比例：胜方按败方战力比×0.3 计损（上限 50%），败方胜方 50%；
-//     进攻失败则进攻方计损 80%。仅占领需防守方被全歼。
-func (s *Service) resolveBattle(ctx context.Context, uid, cid int, troop map[string]any, now int64) error {
-	troopID := model.Int(troop, "id")
-	targetType := model.Int(troop, "target_type")
-	targetID := model.Int(troop, "target_id")
-	task := model.Int(troop, "task")
-	heroID := model.Int(troop, "hero_id")
-	attack := decodeSoldiers(model.Str(troop, "soldiers"))
-
-	attackPower := s.soldiersPower(ctx, attack, "ap")
-	if heroID > 0 {
-		hero, err := s.db.FetchOne(ctx, "select attack_base, attack_add_on from heroes where id=?", heroID)
-		if err == nil {
-			attackPower += model.Int64(hero, "attack_base") + model.Int64(hero, "attack_add_on")
-		}
-	}
-
-	targetName := ""
-	defenders := map[int]int64{}
-	defendPower := int64(0)
-	var loot map[string]int64
-	if targetType == 1 {
-		field, err := s.db.FetchOne(ctx, "select * from fields where id=?", targetID)
-		if err == sql.ErrNoRows {
-			// 目标消失，直接返程。
-			return s.beginReturn(ctx, troopID, attack, now, s.marchSeconds(ctx, attack))
-		} else if err != nil {
-			return err
-		}
-		targetName = model.Str(field, "name")
-		defenders = decodeSoldiers(model.Str(field, "guard_soldiers"))
-		defendPower = s.soldiersPower(ctx, defenders, "dp") + model.Int64(field, "guard_power")
-		loot = map[string]int64{
-			"food": model.Int64(field, "loot_food"),
-			"wood": model.Int64(field, "loot_wood"),
-			"rock": model.Int64(field, "loot_rock"),
-			"iron": model.Int64(field, "loot_iron"),
-			"gold": model.Int64(field, "loot_gold"),
-		}
-	} else {
-		targetName, _ = s.db.FetchCellString(ctx, "select name from cities where id=?", targetID)
-		rows, err := s.db.FetchRows(ctx, "select soldier_id, count from city_soldiers where city_id=?", targetID)
-		if err != nil {
-			return err
-		}
-		for _, r := range rows {
-			defenders[model.Int(r, "soldier_id")] += model.Int64(r, "count")
-		}
-		defendPower = s.soldiersPower(ctx, defenders, "dp")
-	}
-
-	win := attackPower >= defendPower
-	var attLossPct, defLossPct float64
-	if win {
-		attLossPct = powerLossPct(defendPower, attackPower)
-		defLossPct = 0.5
-	} else {
-		attLossPct = 0.8
-		defLossPct = powerLossPct(attackPower, defendPower)
-	}
-	attackLoss, attackSurv := applyLoss(attack, attLossPct)
-	defendLoss, defendSurv := applyLoss(defenders, defLossPct)
-
-	result := 0
-	resultText := "铩羽而归"
-	if win {
-		result = 1
-		resultText = "大获全胜"
-	}
-
-	// 掠夺：野地按配置掠夺，玩家城按其现有资源的 10%。
-	var looted map[string]int64
-	if win && task == TaskPlunder {
-		if targetType == 1 {
-			if sumRes(loot) > 0 {
-				looted = loot
-				if err := s.addResources(ctx, cid, loot); err != nil {
-					return err
-				}
-			}
-		} else {
-			looted = s.stealCity(ctx, targetID, cid)
-		}
-	}
-	lootedJSON := "{}"
-	lootedText := ""
-	if len(looted) > 0 {
-		lootedJSON = marshalRes(looted)
-		lootedText = fmt.Sprintf("掠夺资源：粮%d 木%d 石%d 铁%d 钱%d",
-			looted["food"], looted["wood"], looted["rock"], looted["iron"], looted["gold"])
-	}
-
-	// 防守方减员：野地回写 guard_soldiers，玩家城扣减 city_soldiers。
-	if len(defendLoss) > 0 {
-		if targetType == 1 {
-			if _, err := s.db.Exec(ctx, "update fields set guard_soldiers=? where id=?",
-				encodeSoldiers(defendSurv), targetID); err != nil {
-				return err
-			}
-		} else {
-			for sid, cnt := range defendLoss {
-				if _, err := s.db.Exec(ctx,
-					"update city_soldiers set count=greatest(0,count-?) where city_id=? and soldier_id=?",
-					cnt, targetID, sid); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	// 占领：仅野地，且需防守方被全歼。
-	if win && task == TaskOccupy && targetType == 1 && len(defendSurv) == 0 {
-		if _, err := s.db.Exec(ctx, "update fields set owner_uid=? where id=?", uid, targetID); err != nil {
-			return err
-		}
-	}
-
-	summary, _ := s.soldierSummary(ctx, attack)
-	detail := fmt.Sprintf("%s  进攻 %s：进攻方战力 %d vs 防守方战力 %d，%s。 %s",
-		summary, targetName, attackPower, defendPower, resultText, lootedText)
-	if _, err := s.db.Exec(ctx,
-		`insert into battle_reports (user_id, city_id, hero_id, target_desc, result, attack_loss, defend_loss, looted, detail, created_at)
-		 values (?,?,?,?,?,?,?,?,?,?)`,
-		uid, cid, heroID, targetName, result, encodeSoldiers(attackLoss), encodeSoldiers(defendLoss), lootedJSON, detail, now); err != nil {
-		return err
-	}
-
-	return s.beginReturn(ctx, troopID, attackSurv, now, s.marchSeconds(ctx, attackSurv))
-}
-
-// powerLossPct 按败方/胜方战力比折算胜方损失比例（×0.3，上限 50%）。
-func powerLossPct(lo, hi int64) float64 {
-	if hi <= 0 {
-		return 0
-	}
-	p := float64(lo) / float64(hi) * 0.3
-	if p > 0.5 {
-		p = 0.5
-	}
-	return p
-}
-
-// applyLoss 按比例拆分损失与幸存（向下取整）。
-func applyLoss(m map[int]int64, pct float64) (loss, surv map[int]int64) {
-	loss = map[int]int64{}
-	surv = map[int]int64{}
-	for sid, cnt := range m {
-		l := int64(math.Ceil(float64(cnt) * pct))
-		if l > cnt {
-			l = cnt
-		}
-		if l > 0 {
-			loss[sid] = l
-		}
-		if cnt-l > 0 {
-			surv[sid] = cnt - l
-		}
-	}
-	return loss, surv
-}
-
-// sumRes 汇总一组资源（键为资源名）。
-func sumRes(m map[string]int64) int64 {
-	var t int64
-	for _, v := range m {
-		t += v
-	}
-	return t
-}
-
-// marshalRes 序列化一组资源为 JSON。
-func marshalRes(m map[string]int64) string {
-	b, _ := json.Marshal(m)
-	return string(b)
-}
-
-// soldierSummary 生成 "义兵×30 枪兵×5" 战报前缀。
-func (s *Service) soldierSummary(ctx context.Context, m map[int]int64) (string, error) {
-	sids := make([]int, 0, len(m))
-	for sid, cnt := range m {
-		if cnt > 0 {
-			sids = append(sids, sid)
-		}
-	}
-	sort.Ints(sids)
-	parts := make([]string, 0, len(sids))
-	for _, sid := range sids {
-		name, err := s.db.FetchCellString(ctx, "select name from cfg_soldiers where sid=?", sid)
-		if err != nil {
-			return "", err
-		}
-		parts = append(parts, fmt.Sprintf("%s×%d", name, m[sid]))
-	}
-	return strings.Join(parts, " "), nil
-}
-
-// addResources 把一组资源加入城池。
-func (s *Service) addResources(ctx context.Context, cid int, r map[string]int64) error {
-	_, err := s.db.Exec(ctx,
-		"update city_resources set wood=wood+?,rock=rock+?,iron=iron+?,food=food+?,gold=gold+? where city_id=?",
-		r["wood"], r["rock"], r["iron"], r["food"], r["gold"], cid)
-	return err
-}
-
-// stealCity 掠夺玩家城：拿走目标城 10% 的现有资源并转入进攻方城池。
-func (s *Service) stealCity(ctx context.Context, targetCID, cid int) map[string]int64 {
-	res, err := s.db.FetchOne(ctx, "select wood,rock,iron,food,gold from city_resources where city_id=?", targetCID)
-	if err != nil {
-		return nil
-	}
-	take := map[string]int64{
-		"wood": model.Int64(res, "wood") / 10,
-		"rock": model.Int64(res, "rock") / 10,
-		"iron": model.Int64(res, "iron") / 10,
-		"food": model.Int64(res, "food") / 10,
-		"gold": model.Int64(res, "gold") / 10,
-	}
-	if sumRes(take) == 0 {
-		return nil
-	}
-	if err := s.addResources(ctx, cid, take); err != nil {
-		return nil
-	}
-	_, _ = s.db.Exec(ctx,
-		"update city_resources set wood=greatest(0,wood-?),rock=greatest(0,rock-?),iron=greatest(0,iron-?),food=greatest(0,food-?),gold=greatest(0,gold-?) where city_id=?",
-		take["wood"], take["rock"], take["iron"], take["food"], take["gold"], targetCID)
-	return take
-}
-
 // beginReturn 战后处理：无幸存者则直接结束（释放武将），否则进入返程。
 func (s *Service) beginReturn(ctx context.Context, troopID int, survivors map[int]int64, now, travel int64) error {
 	heroID, _ := s.db.FetchCellInt64(ctx, "select hero_id from troops where id=?", troopID)
@@ -1248,4 +1029,3 @@ func (s *Service) beginReturn(ctx context.Context, troopID int, survivors map[in
 	}
 	return nil
 }
-

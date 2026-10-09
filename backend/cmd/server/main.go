@@ -10,6 +10,7 @@ import (
 	"rxsg/backend/internal/armor"
 	"rxsg/backend/internal/army"
 	"rxsg/backend/internal/auth"
+	"rxsg/backend/internal/battle"
 	"rxsg/backend/internal/building"
 	"rxsg/backend/internal/city"
 	"rxsg/backend/internal/config"
@@ -44,7 +45,9 @@ func main() {
 	buildingSvc := building.NewService(database)
 	buildingHandler := building.NewHandler(buildingSvc)
 	technicHandler := technic.NewHandler(technic.NewService(database))
-	armyHandler := army.NewHandler(army.NewService(database))
+	battleSvc := battle.NewService(database)
+	battleHandler := battle.NewHandler(battleSvc)
+	armyHandler := army.NewHandler(army.NewService(database, battleSvc))
 	heroHandler := hero.NewHandler(hero.NewService(database))
 	cityHandler := city.NewHandler(city.NewService(database, buildingSvc))
 	goodsHandler := goods.NewHandler(goods.NewService(database))
@@ -71,6 +74,7 @@ func main() {
 	cityHandler.Register(protected)
 	buildingHandler.Register(protected)
 	technicHandler.Register(protected)
+	battleHandler.Register(protected)
 	armyHandler.Register(protected)
 	heroHandler.Register(protected)
 	goodsHandler.Register(protected)
