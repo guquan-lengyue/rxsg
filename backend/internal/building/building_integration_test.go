@@ -153,11 +153,12 @@ func TestBuildDuplicateUnique(t *testing.T) {
 func TestBuildQueueFull(t *testing.T) {
 	svc, f := newSvc(t)
 	ctx := bgCtx()
-	for _, x := range []int{4, 5} {
-		if _, err := svc.Build(ctx, f.UID, f.CID, 2, 0, x, 0); err != nil {
-			t.Fatalf("Build x=%d: %v", x, err)
-		}
-	}
+	// 上限判定统计 `buildings where city_id=? and state>0`。若改用「真实建两座再建第三座」，
+	// 结果依赖每次调用的耗时（远端库单次 Build 约 10s，而 ScaledSeconds 至少 1s）：
+	// 先建的两座会在后续调用的惰性结算中完工 → 计数归零，用例不稳定。
+	// 故直接构造两条长时间进行中的记录，使上限判定确定性成立。
+	exec(t, f, "insert into buildings (city_id,building_id,xy,level,state,state_start_at,state_end_at) values (?,2,'c1',20,1,0,unix_timestamp()+100000)", f.CID)
+	exec(t, f, "insert into buildings (city_id,building_id,xy,level,state,state_start_at,state_end_at) values (?,2,'c2',20,1,0,unix_timestamp()+100000)", f.CID)
 	if _, err := svc.Build(ctx, f.UID, f.CID, 2, 0, 6, 0); errMsg(err) != "ask_to_use_yaoyiling" {
 		t.Fatalf("want ask_to_use_yaoyiling, got %q", errMsg(err))
 	}

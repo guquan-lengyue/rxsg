@@ -495,14 +495,24 @@ func (s *Service) Queue(ctx context.Context, uid, cid int) ([]QueueItem, error) 
 			StateEndTime: b.StateEndTime, StateTimeLeft: b.StateEndTime - now,
 		}
 		if b.State == 1 {
+			// 目标等级：优先取队列表（create/destroy 会写入 building_upgrading/destroying）；
+			// 若缺（既有 upgrade 只写 buildings.state=1，不写队列表），按 buildings.level 推导，
+			// 否则会出现「正在建造 … 3→0」的错误展示。
 			item.TargetLevel = upTarget[rid]
-			if item.TargetLevel <= 1 {
+			if item.TargetLevel <= 0 {
+				item.TargetLevel = b.Level + 1
+			}
+			// 原版语义：level==0 表示新建（目标 1 级），否则为升级。
+			if b.Level == 0 {
 				item.Task = "正在建造"
 			} else {
 				item.Task = "正在升级"
 			}
 		} else { // state==2
 			item.TargetLevel = downTarget[rid]
+			if item.TargetLevel <= 0 {
+				item.TargetLevel = b.Level - 1
+			}
 			item.Task = "正在拆除"
 		}
 		out = append(out, item)

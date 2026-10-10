@@ -75,15 +75,25 @@ const panelLoading = ref(false)
 const panelError = ref('')
 const busy = ref(false)
 
-// 建造面板状态（点击内城空地格打开）。inner 传 0（对齐 cfg_buildings 中资源田 inner=0；valid?inner=0
-// 与 create 的 cfg 校验一致，可建造农田/伐木场/采石场/铁矿）。
-const BUILD_INNER = 0
+// inner 语义（对齐原版 BuildingFunc.php:377-384 与 cfg_buildings.inner）：
+//   0 = 城外建筑（资源田 bid 2..5）；1 = 城内建筑；2 = 城墙（重写版无城墙映射，不处理）。
+// 重写版布局（种子 0004/0010）：xy 标签为「列字母 a..d + 行数字 1..n」，第 1 行（y=0）是资源田，
+// 其余为内城。故：空地按所在行判定，既有建筑按 bid 判定。
+const OUTER_BIDS: readonly number[] = [2, 3, 4, 5]
+function innerOfBid(bid: number): number {
+  return OUTER_BIDS.includes(bid) ? 0 : 1
+}
+function innerOfCell(y: number): number {
+  return y === 0 ? 0 : 1
+}
 const showBuild = ref(false)
 const buildCandidates = ref<BuildingCandidate[]>([])
 const buildLoading = ref(false)
 const buildError = ref('')
 const buildBusy = ref(false)
 const buildCell = ref<{ x: number; y: number } | null>(null)
+// 当前建造面板对应的 inner（由点击格所在行决定）
+const buildInner = ref(0)
 
 // 资源地转换面板状态
 const showExchange = ref(false)
@@ -1368,12 +1378,13 @@ async function onSelectEmpty(pos: { x: number; y: number }): Promise<void> {
     return
   }
   buildCell.value = pos
+  buildInner.value = innerOfCell(pos.y)
   buildCandidates.value = []
   buildError.value = ''
   buildLoading.value = true
   showBuild.value = true
   try {
-    buildCandidates.value = await city.loadValidBuildings(activeCid.value, BUILD_INNER)
+    buildCandidates.value = await city.loadValidBuildings(activeCid.value, buildInner.value)
   } catch (e) {
     buildError.value = errorMessage(e)
   } finally {
@@ -1397,7 +1408,7 @@ async function onBuild(bid: number): Promise<void> {
   buildBusy.value = true
   buildError.value = ''
   try {
-    await city.createBuilding(activeCid.value, bid, BUILD_INNER, cell.x, cell.y)
+    await city.createBuilding(activeCid.value, bid, buildInner.value, cell.x, cell.y)
     closeBuild()
   } catch (e) {
     // 资源不足等业务文案由后端 message 原样展示。
@@ -1414,7 +1425,7 @@ function onDestroy(): void {
   if (!b || !activeCid.value) {
     return
   }
-  void runBuildingWrite(() => city.destroyBuilding(activeCid.value, b.bid, BUILD_INNER, b.x, b.y))
+  void runBuildingWrite(() => city.destroyBuilding(activeCid.value, b.bid, innerOfBid(b.bid), b.x, b.y))
 }
 
 function onDestroyAll(): void {
@@ -1422,7 +1433,9 @@ function onDestroyAll(): void {
   if (!b || !activeCid.value) {
     return
   }
-  void runBuildingWrite(() => city.destroyAllBuilding(activeCid.value, b.bid, BUILD_INNER, b.x, b.y))
+  void runBuildingWrite(() =>
+    city.destroyAllBuilding(activeCid.value, b.bid, innerOfBid(b.bid), b.x, b.y),
+  )
 }
 
 function onCancelDestroy(): void {
@@ -1431,7 +1444,7 @@ function onCancelDestroy(): void {
     return
   }
   void runBuildingWrite(() =>
-    city.cancelDestroyBuilding(activeCid.value, b.bid, BUILD_INNER, b.x, b.y),
+    city.cancelDestroyBuilding(activeCid.value, b.bid, innerOfBid(b.bid), b.x, b.y),
   )
 }
 
@@ -1459,7 +1472,7 @@ async function onExchange(targetbid: number): Promise<void> {
   exchangeBusy.value = true
   exchangeError.value = ''
   try {
-    await city.exchangeBuilding(activeCid.value, d.bid, targetbid, BUILD_INNER, d.x, d.y)
+    await city.exchangeBuilding(activeCid.value, d.bid, targetbid, innerOfBid(d.bid), d.x, d.y)
     closeExchange()
   } catch (e) {
     exchangeError.value = errorMessage(e)
