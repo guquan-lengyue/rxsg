@@ -396,6 +396,17 @@ export interface HotelInfo {
   tip?: string
 }
 
+// 官署面板（对齐后端 hero.OfficeInfo，字段名逐字对齐）。
+export interface OfficeInfo {
+  office_level: number
+  valid_position: number
+  nobility: number
+  chief_hero_id: number
+  general_hero_id: number
+  counsellor_hero_id: number
+  heroes: HeroState[]
+}
+
 export interface CityDetail {
   city: City
   base: BaseInfo
@@ -486,5 +497,33 @@ export interface CombineResult {
 export interface EmbedResult {
   started: number
   msg: string
+  pearls: string
+}
+
+// —— 马厩/坐骑（对齐后端 armor 包 R11-3 端点）——
+
+// 马厩道具/坐骑装备行（cfg_goods 行 + 背包 count；字段按 BarnFunc.php 消费列择取）。
+export interface BarnGood {
+  gid: number
+  name: string
+  group_id: number
+  position: number
+  value: number
+  zuoji_type: number
+  count: number
+}
+
+// 坐骑升级结果（对齐后端 armor.UpgradeArmorResult）。
+export interface ArmorUpgradeResult {
+  msg: string
+  good_str: string
+  is_protected: boolean
+  is_succ: boolean
+  armor: BagArmor | null
+}
+
+// 坐骑槽位卸载结果（对齐后端 armor.UnladeResult）。
+export interface UnladeResult {
+  pos: number
   pearls: string
 }

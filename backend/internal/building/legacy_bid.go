@@ -4,13 +4,14 @@ package building
 //
 // ⚠ bid 映射差异（R11-1 已核实，见 docs/SWF解包-脚本与美术资源关联.md §9.1 与后端 0004 头注）：
 //   原版 20 建筑 bid = {1农田 2伐木 3采石 4铁矿 5民房 6官府 7书院 8校场 9军营 10客栈
-//                       11官署 12鸿胪寺 13市场 14铁匠铺 15工坊 16粮仓 17仓库 18驿站 19烽火台 20城墙}
+//                       11官署 12鸿胪寺 13市场 14铁匠铺 15工坊 16马厩 17仓库 18驿站 19烽火台 20城墙}
 //   重写版 DB（migrations/0004 + 0008 + 0010）使用另一套【重写 14 建筑映射】：
 //   1官府 2农田 3伐木场 4采石场 5铁矿 6民居 7书院 8兵营 9仓库 10校场 11官署 12客栈 13市场 14工匠作坊。
 //   两套映射不同源。本次逻辑语义（校验顺序/公式/文案）以 legacy 为准，但落库/查询统一走【重写映射】的
 //   building_id 空间（与既有 building.Service.Upgrade、cfg_buildings、前端一致），由 legacyToNew 显式翻译。
-//   legacy 12/14/16/18/19/20 在新库无对应建筑 → 引用这些 bid 的分支（鸿胪寺/铁匠铺/粮仓/驿站/烽火台/城墙）
-//   惰性化（见 startDestroyBuildingAll 中注释）。
+//   legacy 12/14/18/19/20 在新库无对应建筑（鸿胪寺/铁匠铺/驿站/烽火台/城墙）→ 引用这些 bid 的分支惰性化
+//   （见 startDestroyBuildingAll 中注释）。legacy 16（马厩，ID_BUILDING_BARN）已由迁移 `0020_m13c_barn.sql`
+//   以新库同号 bid 16 补入 cfg_buildings（马厩面板见前端 BarnPanel）。
 //
 // 结论与建议见汇报：如需严格对齐原版 20 bid，须整体切换 cfg_buildings/building_id 并重导数据（本次未动数据）。
 
@@ -38,7 +39,7 @@ const (
 )
 
 // legacyToNew：legacy bid → 新库 building_id（重写映射）。
-// 未落库的 legacy 建筑（鸿胪寺/铁匠铺/粮仓/驿站/烽火台/城墙）不出现在此表。
+// 未落库的 legacy 建筑（鸿胪寺/铁匠铺/驿站/烽火台/城墙）不出现在此表；马厩(16) 见迁移 0020。
 var legacyToNew = map[int]int{
 	IDBuildingGoverment: 1,  // 官府
 	IDBuildingFarmland:  2,  // 农田
@@ -54,6 +55,7 @@ var legacyToNew = map[int]int{
 	IDBuildingHotel:     12, // 客栈
 	IDBuildingMarket:    13, // 市场
 	IDBuildingWorkshop:  14, // 工匠作坊
+	IDBuildingBarn:      16, // 马厩（新库同号；由迁移 0020 补入 cfg_buildings）
 }
 
 // newBidOf legacy bid → 新库 building_id；无对应返回 (0,false)。

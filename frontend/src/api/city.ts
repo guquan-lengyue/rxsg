@@ -18,6 +18,7 @@ import type {
   HeroInfo,
   HotelInfo,
   March,
+  OfficeInfo,
   Technic,
   TechnicInfo,
 } from '@/types'
@@ -321,6 +322,14 @@ export async function clearHeroPoint(cid: number, hid: number): Promise<HeroInfo
 
 export async function setHeroOffice(cid: number, sets: [number, number][]): Promise<HeroInfo> {
   const { data } = await http.post<HeroInfo>(`/cities/${cid}/heroes/office`, { sets })
+  return data
+}
+
+// —— 官署：面板聚合读取（对齐后端 hero.OfficeInfo）——
+
+/** 官署面板信息（GET /cities/:cid/office；无官署建筑时后端返回 400）。 */
+export async function getOfficeInfo(cid: number): Promise<OfficeInfo> {
+  const { data } = await http.get<OfficeInfo>(`/cities/${cid}/office`)
   return data
 }
 

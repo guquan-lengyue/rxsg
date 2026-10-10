@@ -59,6 +59,7 @@ func main() {
 		"migrations/0018_m13b_office_hotel_levels.sql",
 		"migrations/0004_seed_normalized.sql",
 		"migrations/0019_demo_enemy_cities.sql",
+		"migrations/0020_m13c_barn.sql",
 	}
 	for _, f := range files {
 		data, err := os.ReadFile(f)

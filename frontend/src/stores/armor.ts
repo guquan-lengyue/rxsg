@@ -2,12 +2,16 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import * as armorApi from '@/api/armor'
-import type { BagArmor, HeroArmorItem } from '@/types'
+import type { ArmorUpgradeResult, BagArmor, BarnGood, HeroArmorItem, UnladeResult } from '@/types'
 
 // 装备 store：背包列表 + 按武将的穿戴映射（用户级数据，与城池无关）。
+// R2 追加马厩/坐骑状态：马厩道具、槽位可镶嵌装备、未激活坐骑。
 export const useArmorStore = defineStore('armor', () => {
   const bag = ref<BagArmor[]>([])
   const heroArmors = ref<Record<number, HeroArmorItem[]>>({})
+  const barnGoods = ref<BarnGood[]>([])
+  const zuojiArmors = ref<BarnGood[]>([])
+  const unactiveHorse = ref<BagArmor[]>([])
 
   async function loadBag(): Promise<BagArmor[]> {
     bag.value = await armorApi.listBag()
@@ -94,9 +98,41 @@ export const useArmorStore = defineStore('armor', () => {
     return res
   }
 
+  // —— 马厩/坐骑（R2）——
+
+  async function loadBarnGoods(xilianIndex: number): Promise<BarnGood[]> {
+    barnGoods.value = await armorApi.loadBarnGoods(xilianIndex)
+    return barnGoods.value
+  }
+
+  async function loadZuojiArmors(zuojiType: number, armorid: number): Promise<BarnGood[]> {
+    zuojiArmors.value = await armorApi.loadZuojiArmors(zuojiType, armorid)
+    return zuojiArmors.value
+  }
+
+  async function loadUnactiveHorse(): Promise<BagArmor[]> {
+    unactiveHorse.value = await armorApi.loadUnactiveHorse()
+    return unactiveHorse.value
+  }
+
+  async function barnUnlade(sid: number, gid: number, pos: number): Promise<UnladeResult> {
+    const res = await armorApi.barnUnlade(sid, gid, pos)
+    await loadBag()
+    return res
+  }
+
+  async function upgradeArmor(sid: number, isProtected: boolean): Promise<ArmorUpgradeResult> {
+    const res = await armorApi.upgradeArmor(sid, isProtected)
+    await loadBag()
+    return res
+  }
+
   return {
     bag,
     heroArmors,
+    barnGoods,
+    zuojiArmors,
+    unactiveHorse,
     loadBag,
     loadHeroArmors,
     equip,
@@ -111,5 +147,10 @@ export const useArmorStore = defineStore('armor', () => {
     initHoles,
     openHole,
     embed,
+    loadBarnGoods,
+    loadZuojiArmors,
+    loadUnactiveHorse,
+    barnUnlade,
+    upgradeArmor,
   }
 })

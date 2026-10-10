@@ -1,12 +1,15 @@
 import http from './http'
 
 import type {
+  ArmorUpgradeResult,
   BagArmor,
+  BarnGood,
   CombineResult,
   EmbedResult,
   EquipResult,
   HeroArmorItem,
   StrongResult,
+  UnladeResult,
 } from '@/types'
 
 // —— 装备（对齐后端 armor 包 REST 端点）——
@@ -143,5 +146,54 @@ export async function embedPearl(
     gid,
     is_zuoji: isZuoji,
   })
+  return data
+}
+
+// —— 马厩/坐骑（对齐后端 armor 包 R11-3 端点；字段名逐字对齐 handler.go）——
+
+/** 加载马厩道具（洗练符 3 选 1 + 强化/升级材料），POST /armors/barn/goods，xilianIndex∈{0,1,2}。 */
+export async function loadBarnGoods(xilianIndex: number): Promise<BarnGood[]> {
+  const { data } = await http.post<BarnGood[]>('/armors/barn/goods', { xilian_index: xilianIndex })
+  return data
+}
+
+/** 按槽位号加载可镶嵌的坐骑装备（POST /armors/barn/zuoji-armors），zuojiType∈{1..5}。 */
+export async function loadZuojiArmors(zuojiType: number, armorid: number): Promise<BarnGood[]> {
+  const { data } = await http.post<BarnGood[]>('/armors/barn/zuoji-armors', {
+    zuoji_type: zuojiType,
+    armorid,
+  })
+  return data
+}
+
+/** 卸下坐骑某槽位装备（POST /armors/barn/unlade）。 */
+export async function barnUnlade(sid: number, gid: number, pos: number): Promise<UnladeResult> {
+  const { data } = await http.post<UnladeResult>('/armors/barn/unlade', { sid, gid, pos })
+  return data
+}
+
+/** 坐骑/装备升级（POST /armors/upgrade），isProtected 决定是否使用升级保护符。 */
+export async function upgradeArmor(sid: number, isProtected: boolean): Promise<ArmorUpgradeResult> {
+  const { data } = await http.post<ArmorUpgradeResult>('/armors/upgrade', {
+    sid,
+    is_protected: isProtected,
+  })
+  return data
+}
+
+/** 按 embed_pearls 串逐位取宝珠道具行（POST /armors/barn/embed-pearls）。 */
+export async function barnEmbedPearls(gidStr: string): Promise<Record<string, unknown>[]> {
+  const { data } = await http.post<Record<string, unknown>[]>('/armors/barn/embed-pearls', {
+    gid_str: gidStr,
+  })
+  return data
+}
+
+/**
+ * 未激活坐骑列表（GET /armors/barn/unactive-horse）。
+ * 注：后端仅返回装备列表段，原版 6 段属性聚合未实现。
+ */
+export async function loadUnactiveHorse(): Promise<BagArmor[]> {
+  const { data } = await http.get<BagArmor[]>('/armors/barn/unactive-horse')
   return data
 }

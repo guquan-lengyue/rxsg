@@ -19,6 +19,7 @@ import type {
   HeroInfo,
   HotelInfo,
   March,
+  OfficeInfo,
   TechnicInfo,
 } from '@/types'
 
@@ -38,6 +39,7 @@ export const useCityStore = defineStore('city', () => {
   const marches = ref<March[]>([])
   const heroInfo = ref<HeroInfo | null>(null)
   const hotelInfo = ref<HotelInfo | null>(null)
+  const officeInfo = ref<OfficeInfo | null>(null)
   const product = ref<CityProduct | null>(null)
   const troops = ref<CitySoldier[]>([])
   const defences = ref<CityDefence[]>([])
@@ -62,6 +64,7 @@ export const useCityStore = defineStore('city', () => {
     marches.value = []
     heroInfo.value = null
     hotelInfo.value = null
+    officeInfo.value = null
     product.value = null
     troops.value = []
     defences.value = []
@@ -308,6 +311,13 @@ export const useCityStore = defineStore('city', () => {
     return heroInfo.value
   }
 
+  // —— 官署：面板聚合读取（对齐后端 hero.OfficeInfo）——
+
+  async function loadOfficeInfo(cid: number): Promise<OfficeInfo> {
+    officeInfo.value = await cityApi.getOfficeInfo(cid)
+    return officeInfo.value
+  }
+
   // —— 客栈：招募池 / 招募 / 招贤榜重置 ——
 
   async function loadHotelInfo(cid: number): Promise<HotelInfo> {
@@ -425,6 +435,7 @@ export const useCityStore = defineStore('city', () => {
     marches,
     heroInfo,
     hotelInfo,
+    officeInfo,
     product,
     troops,
     defences,
@@ -461,6 +472,7 @@ export const useCityStore = defineStore('city', () => {
     addHeroPoint,
     clearHeroPoint,
     setHeroOffice,
+    loadOfficeInfo,
     loadHotelInfo,
     recruitHero,
     resetHotel,

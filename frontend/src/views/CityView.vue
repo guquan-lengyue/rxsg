@@ -11,6 +11,8 @@ import ArmyPanel from '@/components/ArmyPanel.vue'
 import ArmorPanel from '@/components/ArmorPanel.vue'
 import HeroPanel from '@/components/HeroPanel.vue'
 import HotelPanel from '@/components/HotelPanel.vue'
+import OfficePanel from '@/components/OfficePanel.vue'
+import BarnPanel from '@/components/BarnPanel.vue'
 import ResourceBar from '@/components/ResourceBar.vue'
 import TechnicPanel from '@/components/TechnicPanel.vue'
 import MarketPanel from '@/components/MarketPanel.vue'
@@ -446,6 +448,178 @@ async function onHotelReset(): Promise<void> {
     hotelError.value = errorMessage(e)
   } finally {
     hotelBusy.value = false
+  }
+}
+
+// 官署面板状态（bid=11）
+const showOffice = ref(false)
+const officeLoading = ref(false)
+const officeError = ref('')
+const officeNotice = ref('')
+const officeBusy = ref(false)
+
+async function openOffice(b: Building): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  // 官署专面板内复用建筑操作：需同时加载该建筑详情（供 BuildingOps 使用），并记录选中建筑。
+  selected.value = b
+  buildingDetail.value = null
+  panelError.value = ''
+  showOffice.value = true
+  officeError.value = ''
+  officeNotice.value = ''
+  officeLoading.value = true
+  try {
+    const [detail] = await Promise.all([
+      city.loadBuildingDetail(activeCid.value, b.bid, b.x, b.y),
+      city.loadOfficeInfo(activeCid.value),
+    ])
+    buildingDetail.value = detail
+  } catch (e) {
+    officeError.value = errorMessage(e)
+  } finally {
+    officeLoading.value = false
+  }
+}
+
+function closeOffice(): void {
+  showOffice.value = false
+  officeError.value = ''
+  officeNotice.value = ''
+  officeBusy.value = false
+  if (selected.value?.bid === 11) {
+    selected.value = null
+    buildingDetail.value = null
+  }
+}
+
+// 任命：成功后刷新官署聚合与武将列表（后端 SetChief 返回整份武将列表，store 已回写）。
+async function onOfficeSet(sets: [number, number][]): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  officeBusy.value = true
+  officeError.value = ''
+  officeNotice.value = ''
+  try {
+    await city.setHeroOffice(activeCid.value, sets)
+    await city.loadOfficeInfo(activeCid.value)
+  } catch (e) {
+    officeError.value = errorMessage(e)
+  } finally {
+    officeBusy.value = false
+  }
+}
+
+// 马厩面板状态（bid=16）
+const showBarn = ref(false)
+const barnLoading = ref(false)
+const barnError = ref('')
+const barnNotice = ref('')
+const barnBusy = ref(false)
+
+// 坐骑 = 背包中 part=12 的装备（cfg_armor.part）。
+const mounts = computed(() => armor.bag.filter((a) => a.part === 12))
+
+async function openBarn(b: Building): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  // 马厩专面板内复用建筑操作：需同时加载该建筑详情（供 BuildingOps 使用），并记录选中建筑。
+  selected.value = b
+  buildingDetail.value = null
+  panelError.value = ''
+  showBarn.value = true
+  barnError.value = ''
+  barnNotice.value = ''
+  barnLoading.value = true
+  try {
+    const [detail] = await Promise.all([
+      city.loadBuildingDetail(activeCid.value, b.bid, b.x, b.y),
+      armor.loadBag(),
+      armor.loadBarnGoods(0),
+      armor.loadUnactiveHorse(),
+    ])
+    buildingDetail.value = detail
+  } catch (e) {
+    barnError.value = errorMessage(e)
+  } finally {
+    barnLoading.value = false
+  }
+}
+
+function closeBarn(): void {
+  showBarn.value = false
+  barnError.value = ''
+  barnNotice.value = ''
+  barnBusy.value = false
+  if (selected.value?.bid === 16) {
+    selected.value = null
+    buildingDetail.value = null
+  }
+}
+
+async function runBarn(fn: () => Promise<unknown>): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  barnBusy.value = true
+  barnError.value = ''
+  barnNotice.value = ''
+  try {
+    await fn()
+  } catch (e) {
+    barnError.value = errorMessage(e)
+  } finally {
+    barnBusy.value = false
+  }
+}
+
+function onBarnLoadGoods(xilianIndex: number): void {
+  void runBarn(() => armor.loadBarnGoods(xilianIndex))
+}
+
+function onBarnLoadSlot(zuojiType: number, armorid: number): void {
+  void runBarn(() => armor.loadZuojiArmors(zuojiType, armorid))
+}
+
+// 重新拉取指定槽位可镶嵌装备（装备/卸载后背包变化）。
+async function refreshBarnSlot(sid: number, pos: number): Promise<void> {
+  const mount = armor.bag.find((a) => a.sid === sid)
+  await armor.loadZuojiArmors(pos + 1, mount?.armorid ?? 0)
+  await armor.loadUnactiveHorse()
+}
+
+function onBarnEmbed(sid: number, pos: number, gid: number): void {
+  void runBarn(async () => {
+    await armor.embed(sid, pos, gid, 1)
+    await refreshBarnSlot(sid, pos)
+  })
+}
+
+function onBarnUnlade(sid: number, gid: number, pos: number): void {
+  void runBarn(async () => {
+    await armor.barnUnlade(sid, gid, pos)
+    await refreshBarnSlot(sid, pos)
+  })
+}
+
+// 升级成功/失败文案取自后端 message（ArmorFunc.php getUpgradeResultMsg）。
+async function onBarnUpgrade(sid: number, isProtected: boolean): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  barnBusy.value = true
+  barnError.value = ''
+  barnNotice.value = ''
+  try {
+    const res = await armor.upgradeArmor(sid, isProtected)
+    barnNotice.value = res.msg
+  } catch (e) {
+    barnError.value = errorMessage(e)
+  } finally {
+    barnBusy.value = false
   }
 }
 
@@ -1290,6 +1464,15 @@ async function selectBuilding(b: Building): Promise<void> {
     await openHotel()
     return
   }
+  // 原版点击官署（bid=11）/ 马厩（bid=16）直接进入对应专面板（对齐 DialogManager.getBuildingDialog）。
+  if (b.bid === 11) {
+    await openOffice(b)
+    return
+  }
+  if (b.bid === 16) {
+    await openBarn(b)
+    return
+  }
   selected.value = b
   buildingDetail.value = null
   panelError.value = ''
@@ -1491,6 +1674,11 @@ function closePanel(): void {
 // 心跳刷新建筑列表后，同步刷新已选建筑详情（用于展示升级完成后的等级）。
 watch(() => city.buildings, refreshSelectedDetail, { deep: false })
 
+// 官署(11)/马厩(16) 走各自专面板（其面板内已内嵌 BuildingOps），不再渲染通用建筑面板。
+const showBuildingPanel = computed(
+  () => selected.value !== null && selected.value.bid !== 11 && selected.value.bid !== 16,
+)
+
 const title = computed(() => city.currentCity?.name || '—')
 
 function parseCid(): number {
@@ -1509,6 +1697,8 @@ async function enterCity(cid: number): Promise<void> {
   closeArmy()
   closeHeroes()
   closeHotel()
+  closeOffice()
+  closeBarn()
   closeEconomy()
   closeBattle()
   closeTasks()
@@ -1614,7 +1804,7 @@ onBeforeUnmount(() => {
             @select-empty="onSelectEmpty"
           />
           <BuildingPanel
-            v-if="selected"
+            v-if="showBuildingPanel && selected"
             :detail="buildingDetail"
             :loading="panelLoading"
             :error="panelError"
@@ -1704,6 +1894,47 @@ onBeforeUnmount(() => {
       @recruit="onHotelRecruit"
       @reset="onHotelReset"
       @close="closeHotel"
+    />
+
+    <OfficePanel
+      v-if="showOffice"
+      :info="city.officeInfo"
+      :detail="buildingDetail"
+      :loading="officeLoading"
+      :error="officeError || panelError"
+      :notice="officeNotice"
+      :busy="officeBusy || busy"
+      @set-office="onOfficeSet"
+      @upgrade="onUpgrade"
+      @stop="onStop"
+      @destroy="onDestroy"
+      @destroy-all="onDestroyAll"
+      @cancel-destroy="onCancelDestroy"
+      @close="closeOffice"
+    />
+
+    <BarnPanel
+      v-if="showBarn"
+      :mounts="mounts"
+      :unactive="armor.unactiveHorse"
+      :goods="armor.barnGoods"
+      :slot-goods="armor.zuojiArmors"
+      :detail="buildingDetail"
+      :loading="barnLoading"
+      :error="barnError || panelError"
+      :notice="barnNotice"
+      :busy="barnBusy || busy"
+      @load-goods="onBarnLoadGoods"
+      @load-slot="onBarnLoadSlot"
+      @embed="onBarnEmbed"
+      @unlade="onBarnUnlade"
+      @upgrade="onBarnUpgrade"
+      @building-upgrade="onUpgrade"
+      @stop="onStop"
+      @destroy="onDestroy"
+      @destroy-all="onDestroyAll"
+      @cancel-destroy="onCancelDestroy"
+      @close="closeBarn"
     />
 
     <ArmorPanel
