@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import SkinDialog from '@/components/SkinDialog.vue'
+import { armor, itemIcon } from '@/assets/img'
 import type { Task, TaskDetail, TaskGroup, TaskReward } from '@/api/task'
 
 const props = defineProps<{
@@ -100,6 +101,26 @@ function rewardText(r: TaskReward): string {
 function onClaim(tid: number): void {
   emit('claim', tid, 0, 0)
 }
+
+// 奖励图标（仅视觉）：仅对有可靠映射的类别出图，其余保持纯文字。
+//   sort=2 道具：type 即 gid（backend reward.go GiveReward case 2 → giveGoods）→ item_{gid}.png；type=0 为礼金 → item_0.png。
+//   sort=6 装备：type 即 armorid（GiveReward case 6 → giveArmor）→ armor/{id}.png。
+// 资源、兵力、城防、任务物品等无对应图标资源，返回空串不加图标。
+function rewardIcon(r: TaskReward): string {
+  if (r.sort === 2) {
+    return itemIcon(r.type)
+  }
+  if (r.sort === 6 && r.type > 0) {
+    return armor(r.type)
+  }
+  return ''
+}
+
+// 图标加载失败时直接隐藏（原版风格：缺图不报错、不留破图）。
+const failedIcons = ref<Record<number, boolean>>({})
+function onRewardIconError(id: number): void {
+  failedIcons.value = { ...failedIcons.value, [id]: true }
+}
 </script>
 
 <template>
@@ -173,7 +194,16 @@ function onClaim(tid: number): void {
         <div class="d-block">
           <span class="d-label">奖励</span>
           <ul class="rewards">
-            <li v-for="r in detail.rewards" :key="r.id">{{ rewardText(r) }}</li>
+            <li v-for="r in detail.rewards" :key="r.id">
+              <img
+                v-if="rewardIcon(r) && !failedIcons[r.id]"
+                class="r-icon"
+                :src="rewardIcon(r)"
+                alt=""
+                @error="onRewardIconError(r.id)"
+              />
+              <span>{{ rewardText(r) }}</span>
+            </li>
             <li v-if="!detail.rewards.length" class="u-hint">无奖励</li>
           </ul>
         </div>
@@ -349,6 +379,12 @@ function onClaim(tid: number): void {
   padding: 2px 0;
   font-size: 13px;
   color: var(--text-dim);
+}
+
+.r-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 .goals li.done .content {

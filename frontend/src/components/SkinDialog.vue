@@ -8,6 +8,8 @@ defineProps<{
   wide?: boolean
   /** 是否允许点击遮罩关闭（默认允许） */
   maskClosable?: boolean
+  /** 正文区随内容增高（解除 .u-scroll 的 60vh 上限；地图等需完整可见的面板使用）。默认沿用 60vh 上限。 */
+  grow?: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -20,7 +22,7 @@ const emit = defineEmits<{ (e: 'close'): void }>()
         <strong>{{ title }}</strong>
         <button class="u-close" type="button" title="关闭" @click="emit('close')"></button>
       </header>
-      <div class="skin-body u-scroll">
+      <div class="skin-body u-scroll" :class="{ 'is-grow': grow }">
         <slot />
       </div>
       <footer v-if="$slots.footer" class="skin-foot">
@@ -61,6 +63,11 @@ const emit = defineEmits<{ (e: 'close'): void }>()
   min-height: 0;
   padding: 8px 2px;
   overflow-y: auto;
+}
+
+/* 解除 .u-scroll 的 60vh 上限，使正文随内容增高（父级 .skin-dialog 的 max-height 仍兜底）。 */
+.skin-body.is-grow {
+  max-height: none;
 }
 
 .skin-foot {

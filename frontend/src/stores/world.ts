@@ -43,6 +43,17 @@ export const useWorldStore = defineStore('world', () => {
     return { x: Math.min(Math.max(0, x), max.x), y: Math.min(Math.max(0, y), max.y) }
   }
 
+  /** 调整可视行数（cols 不变）：视野钳制回界内，并预取新增 block，避免 resizing 后出现空白。 */
+  function setRows(n: number): void {
+    const r = Math.max(1, Math.min(WORLD_SIZE, Math.round(n)))
+    if (r === rows.value) {
+      return
+    }
+    rows.value = r
+    view.value = clampView(view.value.x, view.value.y)
+    void ensureArea(view.value.x, view.value.y, cols.value, rows.value)
+  }
+
   /** 加载若干 block（已加载的跳过），合并进 cells 并回写 marks。 */
   async function loadBlocks(blocks: number[]): Promise<void> {
     const need = blocks.filter((b) => !loadedBlocks.has(b))
@@ -164,6 +175,7 @@ export const useWorldStore = defineStore('world', () => {
     view,
     cols,
     rows,
+    setRows,
     marks,
     selectedWid,
     selectedCity,

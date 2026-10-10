@@ -141,13 +141,19 @@ func (s *Service) BaseInfo(ctx context.Context, uid, cid int) (*BaseInfo, error)
 		troops = append(troops, model.SoldierFromMap(r))
 	}
 
+	// R11-2 项②：对齐 doGetCityBaseInfo（utils.php:838）回包中的 sys_alarm。
+	alarm, err := s.alarmOf(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
 	return &BaseInfo{
 		User:     model.UserFromMap(userRow),
 		Resource: model.CityResourceFromMap(resRow),
 		Heroes:   heroes,
 		Troops:   troops,
 		Defences: []model.Defence{},
-		Alarm:    model.Alarm{},
+		Alarm:    alarm,
 	}, nil
 }
 
@@ -222,12 +228,7 @@ func (s *Service) GetTroops(ctx context.Context, uid, cid int) ([]model.Soldier,
 	return base.Troops, nil
 }
 
-func (s *Service) GetDefences(ctx context.Context, uid, cid int) ([]model.Defence, error) {
-	if err := s.ensureOwner(ctx, uid, cid); err != nil {
-		return nil, err
-	}
-	return []model.Defence{}, nil
-}
+// GetDefences R11-2 项③：城防器械信息，见 defence.go（1:1 复刻 DefenceFunc.php doGetDefenceInfo）。
 
 func (s *Service) GetHeroes(ctx context.Context, uid, cid int) ([]model.Hero, error) {
 	if err := s.ensureOwner(ctx, uid, cid); err != nil {
@@ -240,9 +241,26 @@ func (s *Service) GetHeroes(ctx context.Context, uid, cid int) ([]model.Hero, er
 	return base.Heroes, nil
 }
 
+// alarmOf 对齐 legacy getGlobalInfo（global.php:92）/ doGetCityBaseInfo（utils.php:838）的
+// `select * from sys_alarm where uid`。新库 alarms(user_id, report, task) 的映射口径：
+//
+//	task ← alarms.task  （legacy sys_alarm.task：是否有可领取任务，TaskFunc.php:644/993）
+//	mail ← alarms.report（【按前端口径在服务端计算，非 legacy 原样】：旧库 mail=未读系统邮件、
+//	                      report=未读战报；新库无邮件子系统，故以前端 mail 红点承载未读战报 report）。
+func (s *Service) alarmOf(ctx context.Context, uid int) (model.Alarm, error) {
+	row, err := s.db.FetchOne(ctx, "select task, report from alarms where user_id=?", uid)
+	if err == sql.ErrNoRows {
+		return model.Alarm{UID: uid}, nil
+	}
+	if err != nil {
+		return model.Alarm{}, err
+	}
+	return model.Alarm{UID: uid, Task: model.Int(row, "task"), Mail: model.Int(row, "report")}, nil
+}
+
 func (s *Service) GetAlarms(ctx context.Context, uid, cid int) (model.Alarm, error) {
 	if err := s.ensureOwner(ctx, uid, cid); err != nil {
 		return model.Alarm{}, err
 	}
-	return model.Alarm{}, nil
+	return s.alarmOf(ctx, uid)
 }

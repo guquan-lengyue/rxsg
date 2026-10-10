@@ -1220,7 +1220,7 @@ function onWorldGovern(payload: GovernPayload): void {
   )
 }
 
-// 出征复用 army dispatch（target_type=2/城池，task=3 掠夺）；成功走 HTTP 200。
+// 出征复用 army dispatch（target_type=2/城池，task 由地图侧任务按钮决定）；成功走 HTTP 200。
 async function onWorldDispatch(payload: DispatchPayload): Promise<void> {
   if (!activeCid.value) {
     return
@@ -1428,7 +1428,7 @@ onBeforeUnmount(() => {
         <button class="nav-btn economy" type="button" title="经济" @click="openEconomy"></button>
         <button class="nav-btn achievement" type="button" title="成就" @click="openAchievements"></button>
         <button class="nav-btn lottery" type="button" title="幸运宝匣" @click="openLottery"></button>
-        <button class="nav-text" type="button" title="战斗战报" @click="openBattle">战报</button>
+        <button class="nav-btn report" type="button" title="战斗战报" @click="openBattle"></button>
         <span class="user">{{ auth.user?.name || auth.user?.passport }}</span>
         <button class="logout" @click="onLogout">{{ zhCN.city.logout }}</button>
       </div>
@@ -1935,6 +1935,20 @@ select {
   background-image: url('/images/lottery_box_btn_down.png');
 }
 
+/* 战报：原版 topbutton_report 贴图（源图 116×45，按 88×34 适配顶栏，保持比例与可读性）。
+   红/蓝变体（_red/_blue）需未读战报数据源，当前无对应字段，故只用常态。 */
+.nav-btn.report {
+  width: 88px;
+  height: 34px;
+  background-image: url('/images/topbutton_report_up.png');
+}
+.nav-btn.report:hover:not(:active) {
+  background-image: url('/images/topbutton_report_over.png');
+}
+.nav-btn.report:active {
+  background-image: url('/images/topbutton_report_down.png');
+}
+
 /* 科技：原版无对应 topbutton，用 topicon_tactic 图标 + 文字合成 */
 .nav-tech {
   display: inline-flex;
@@ -1949,8 +1963,7 @@ select {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* 装备：同科技按钮样式（原版装备入口在武将面板内，此处为独立入口）；
-   战报：沿用同一文字按钮样式。 */
+/* 装备：同科技按钮样式（原版装备入口在武将面板内，此处为独立入口）。 */
 .nav-armor,
 .nav-text {
   display: inline-flex;

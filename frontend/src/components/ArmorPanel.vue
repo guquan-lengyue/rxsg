@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 
 import { zhCN } from '@/lang/zh-CN'
+import { img } from '@/assets/img'
 import type { BagArmor, HeroArmorItem, HeroState } from '@/types'
 import type { StrongPayload } from '@/api/armor'
 
@@ -126,6 +127,31 @@ const holeForm = reactive<{ gid: number; pos: number; useType: number; count: nu
 })
 const holes = computed(() => (selected.value?.embed_holes ?? '').split(',').filter((s) => s !== ''))
 const pearls = computed(() => (selected.value?.embed_pearls ?? '').split(',').filter((s) => s !== ''))
+
+// 孔位占位图（仅视觉占位；沿用既有 embed_holes/embed_pearls 数据，不改语义）。
+//   已镶嵌宝珠 → item_default_embedPearl（embeds 无宝珠等级字段，先回退；有等级时可用 embed_pearl_bg{n}）
+//   已开孔(h==='0') → item_default_embedArmorPearl_open
+//   锁定(h==='1'/'2'/'4') → item_default_embedArmorPearl_lock / _lock2 / _lock3（对应初/高/特级打孔器，参照 BlackSmith/BSCommandDialog.as set5EmbedPearls）
+//   不开(h==='3') 及其他 → item_default_embedArmorPearl
+// 说明：这批 embed_*/item_default_* 在 tools/asset-index.json 中 embed 族 referencedByScript=false。
+function holeImage(i: number): string {
+  const pearl = pearls.value[i]
+  if (pearl && pearl !== '0') {
+    return img('item_default_embedPearl.png')
+  }
+  switch (holes.value[i]) {
+    case '0':
+      return img('item_default_embedArmorPearl_open.png')
+    case '1':
+      return img('item_default_embedArmorPearl_lock.png')
+    case '2':
+      return img('item_default_embedArmorPearl_lock2.png')
+    case '4':
+      return img('item_default_embedArmorPearl_lock3.png')
+    default:
+      return img('item_default_embedArmorPearl.png')
+  }
+}
 
 function selectArmor(a: BagArmor): void {
   selectedSid.value = a.sid
@@ -319,8 +345,14 @@ function selectArmor(a: BagArmor): void {
             </button>
           </div>
           <div v-if="holes.length" class="row holes">
-            <span v-for="(h, i) in holes" :key="i" class="hole" :class="{ open: h === '0' }">
-              {{ pearls[i] && pearls[i] !== '0' ? pearls[i] : h === '0' ? '◇' : '◆' + h }}
+            <span
+              v-for="(h, i) in holes"
+              :key="i"
+              class="hole"
+              :class="{ open: h === '0' }"
+              :title="pearls[i] && pearls[i] !== '0' ? pearls[i] : h === '0' ? '◇' : '◆' + h"
+            >
+              <img class="hole-img" :src="holeImage(i)" alt="" />
             </span>
           </div>
           <div class="row">
@@ -480,6 +512,12 @@ function selectArmor(a: BagArmor): void {
 .hole.open {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.hole-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 select,

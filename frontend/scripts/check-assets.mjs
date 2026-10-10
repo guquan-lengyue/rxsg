@@ -1,9 +1,10 @@
-// 资源核对脚本（整理版）：三段核对
+// 资源核对脚本（整理版）：四段核对
 //   1) 缺失核对：src 中【字面量】/images/ 引用 与 public/images 实际文件比对
 //   2) 动态规则核对：从 src 的 img(`...`) 模板提取命名规则，统计各规则命中的资源数
 //   3) 未使用清单：public/images 中未被任何字面量或动态规则命中的文件（候选冗余）
-// 用法：node scripts/check-assets.mjs   （缺失时退出码 1）
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+//   4) 交叉核对：tools/asset-index.json 的 cross.referencedNotInSrc（AS 已引用、重写版未接入的资源族）
+// 用法：node scripts/check-assets.mjs   （仅当【字面量引用缺失】时退出码 1）
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs'
 import { join, dirname, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -128,5 +129,45 @@ console.log('\n未使用明细（前 120 个，完整清单可用 --list 输出�
 const limit = process.argv.includes('--list') ? unused.length : 120
 for (const f of unused.slice(0, limit)) console.log(`  ${f}`)
 if (unused.length > limit) console.log(`  ... 其余 ${unused.length - limit} 个（--list 查看全部）`)
+
+// ── 5) 第 4 段：tools/asset-index.json 交叉核对 ─────────────────────────────
+// AS 已引用（embed/filename/string/bare）、但重写版 src 尚未接入的资源族。
+// frontCount>0 = 前端 public/images 已有文件，可直接接入；frontCount=0 = ⚠ 前端无文件。
+console.log('\n=== 4) AS 已引用、重写版尚未接入的资源族（源：../tools/asset-index.json → cross.referencedNotInSrc） ===')
+const indexPath = join(ROOT, '..', 'tools', 'asset-index.json')
+if (!existsSync(indexPath)) {
+  console.log('  未找到 ../tools/asset-index.json，跳过本段。')
+} else {
+  let cross = null
+  try {
+    cross = JSON.parse(readFileSync(indexPath, 'utf8'))?.cross?.referencedNotInSrc
+  } catch (e) {
+    console.log(`  读取失败：${e.message}`)
+  }
+  if (!Array.isArray(cross) || cross.length === 0) {
+    console.log('  cross.referencedNotInSrc 为空或缺失。')
+  } else {
+    const rows = cross
+      .map((it) => ({
+        family: it.family,
+        refCount: Number(it.refCount) || 0,
+        frontCount: Number(it.frontCount) || 0,
+      }))
+      .sort((a, b) => b.refCount - a.refCount)
+    const refTotal = rows.reduce((s, r) => s + r.refCount, 0)
+    const hasFront = rows.filter((r) => r.frontCount > 0)
+    const noFront = rows.filter((r) => r.frontCount <= 0)
+    console.log(
+      `  族数 ${rows.length}；AS 引用合计 ${refTotal} 次；` +
+        `前端已有文件（frontCount>0，可直接接入）${hasFront.length} 族；⚠ 前端无文件 ${noFront.length} 族`,
+    )
+    console.log('  按 AS 引用次数降序（前 40）：')
+    for (const r of rows.slice(0, 40)) {
+      const tag = r.frontCount > 0 ? `\u2714 可直接接入 frontCount=${r.frontCount}` : '⚠ 前端无文件'
+      console.log(`    refCount=${String(r.refCount).padStart(4)}  ${tag.padEnd(26)}  ${r.family}`)
+    }
+    if (rows.length > 40) console.log(`    ... 其余 ${rows.length - 40} 族（共 ${rows.length}）`)
+  }
+}
 
 if (missing.length) process.exit(1)

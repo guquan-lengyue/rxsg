@@ -1,11 +1,14 @@
 <script setup lang="ts">
 // 世界地图面板：Canvas 栅格（worldGrid.ts）+ 选中目标侧栏 + 收藏/我的领地页签。
-// props in / events out：面板内不直接调用 store，写操作由父级（CityView）经 runX 执行。
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+// props in / events out：业务写操作由父级（CityView）经 runX 执行，面板内不直接调用 store；
+// 例外：视口自适应行数（fitRows → world.setRows）属布局，直接写 store 的 rows 以保证单一来源。
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import type { CSSProperties } from 'vue'
 
 import SkinDialog from '@/components/SkinDialog.vue'
 import { img } from '@/assets/img'
-import { CELL_H, CELL_W, drawWorldGrid, widAt, widToCid } from '@/render/worldGrid'
+import { CELL_H, CELL_W, WORLD_SIZE, drawWorldGrid, widAt, widToCid } from '@/render/worldGrid'
+import { useWorldStore } from '@/stores/world'
 import type {
   FavouritesResult,
   GovernInfo,
@@ -66,8 +69,124 @@ const gotoInput = ref('')
 const hoverWid = ref(0)
 const hoverPos = ref({ x: 0, y: 0 })
 
+const world = useWorldStore()
+
+// 按视口可用高度推导可视行数（列数保持 12），每格仍为 CELL_W×CELL_H 像素，不做 CSS 缩放
+// （命中测试依赖 e.offsetX/offsetY 与常量，缩放会使选格/拖拽失真）。
+// 预留高度 = 弹窗外边距 24×2 + 对话框边框/内边距 + 标题栏 + 底部按钮栏 + 正文内边距
+//          + 视野提示行 + 画布下的小地图/提示行（实测合计 351px）。
+const MAP_ROWS_MIN = 4
+const MAP_ROWS_MAX = 8
+const MAP_RESERVED_H = 351
+
+/** 依视口高度计算并写入行数（cols/rows 仍是 store 的单一来源，绘制/分块/翻页共用）。 */
+function fitRows(): void {
+  const next = Math.max(
+    MAP_ROWS_MIN,
+    Math.min(MAP_ROWS_MAX, Math.floor((window.innerHeight - MAP_RESERVED_H) / CELL_H)),
+  )
+  world.setRows(next)
+}
+
 const minimapUrl = img('minimap.jpg')
-const mapUpUrl = img('map_up.png')
+
+// —— 原版地图控件贴图（public/images 实存；对应 AS images/map_*、images/ditu_*、images/move_to_*）——
+/** 三态按钮贴图：常态 / 悬停 / 按下。 */
+interface BtnSkin {
+  up: string
+  hl: string
+  dn: string
+}
+
+interface DirButton extends BtnSkin {
+  key: string
+  title: string
+  dx: number
+  dy: number
+}
+
+// 8 向方向按钮：up 的按下态用 _pr，其余用 _down（与 AS 内嵌类一致）。
+const DIR_BUTTONS: DirButton[] = [
+  { key: 'up', title: '上移', dx: 0, dy: -1, up: img('map_up_up.png'), hl: img('map_up_hl.png'), dn: img('map_up_pr.png') },
+  { key: 'down', title: '下移', dx: 0, dy: 1, up: img('map_down_up.png'), hl: img('map_down_hl.png'), dn: img('map_down_down.png') },
+  { key: 'left', title: '左移', dx: -1, dy: 0, up: img('map_left_up.png'), hl: img('map_left_hl.png'), dn: img('map_left_down.png') },
+  { key: 'right', title: '右移', dx: 1, dy: 0, up: img('map_right_up.png'), hl: img('map_right_hl.png'), dn: img('map_right_down.png') },
+  { key: 'upleft', title: '左上移', dx: -1, dy: -1, up: img('map_upleft_up.png'), hl: img('map_upleft_hl.png'), dn: img('map_upleft_down.png') },
+  { key: 'upright', title: '右上移', dx: 1, dy: -1, up: img('map_upright_up.png'), hl: img('map_upright_hl.png'), dn: img('map_upright_down.png') },
+  { key: 'downleft', title: '左下移', dx: -1, dy: 1, up: img('map_downleft_up.png'), hl: img('map_downleft_hl.png'), dn: img('map_downleft_down.png') },
+  { key: 'downright', title: '右下移', dx: 1, dy: 1, up: img('map_downright_up.png'), hl: img('map_downright_hl.png'), dn: img('map_downright_down.png') },
+]
+
+const controllerBg = img('map_controller.png')
+const controllerBarBg = img('map_controller1_bg.png')
+
+/** 三态贴图 → CSS 自定义属性（style 绑定用，避免 any）。 */
+function btnStyle(skin: BtnSkin): CSSProperties {
+  return { '--btn-up': `url(${skin.up})`, '--btn-hl': `url(${skin.hl})`, '--btn-dn': `url(${skin.dn})` }
+}
+
+// 定位我的城池：复用既有 goto-cid（父级 centerOnWid + selectCell），不新增业务。
+const MYCITY_SKIN: BtnSkin = { up: img('map_mycity_up.png'), hl: img('map_mycity_hl.png'), dn: img('map_mycity_down.png') }
+
+function onMyCity(): void {
+  if (props.myCid > 0) {
+    emit('goto-cid', props.myCid)
+  }
+}
+
+// 移动模式：现版拖拽平移常驻、无模式开关，故仅做视觉按钮并禁用。
+const MOVE_SKIN: BtnSkin = { up: img('map_move_up.png'), hl: img('map_move_hl.png'), dn: img('map_move_down.png') }
+
+// 左右翻页：复用 view 事件按一屏平移；禁用态用 *_disbaled 贴图。
+interface PageSkin {
+  up: string
+  over: string
+  down: string
+  disabled: string
+}
+
+const PAGE_LEFT_SKIN: PageSkin = {
+  up: img('move_to_left.png'),
+  over: img('move_to_left_over.png'),
+  down: img('move_to_left_down.png'),
+  disabled: img('move_to_left_disbaled.png'),
+}
+const PAGE_RIGHT_SKIN: PageSkin = {
+  up: img('move_to_right.png'),
+  over: img('move_to_right_over.png'),
+  down: img('move_to_right_down.png'),
+  disabled: img('move_to_right_disbaled.png'),
+}
+
+const canPageLeft = computed(() => props.viewX > 0)
+const canPageRight = computed(() => props.viewX + props.cols < WORLD_SIZE)
+
+function pageLeft(): void {
+  pan(-props.cols, 0)
+}
+
+function pageRight(): void {
+  pan(props.cols, 0)
+}
+
+function pageStyle(skin: PageSkin, enabled: boolean): CSSProperties {
+  if (!enabled) {
+    const d = `url(${skin.disabled})`
+    return { '--btn-up': d, '--btn-hl': d, '--btn-dn': d }
+  }
+  return { '--btn-up': `url(${skin.up})`, '--btn-hl': `url(${skin.over})`, '--btn-dn': `url(${skin.down})` }
+}
+
+// 地图容器边框/侧边/底部/四角/关闭页签（装饰层均 pointer-events:none，不遮挡 canvas 交互）。
+const FRAME_IMGS = {
+  side: img('ditu_side.png'),
+  bottom: img('ditu_bottom.png'),
+  corner1: img('ditu_b1.png'),
+  corner2: img('ditu_b2.png'),
+  corner3: img('ditu_b3.png'),
+  corner4: img('ditu_b4.png'),
+}
+const CLOSE_SKIN: BtnSkin = { up: img('ditu_close1.png'), hl: img('ditu_close2.png'), dn: img('ditu_close2.png') }
 
 // —— 高亮集合 ——
 const ownWids = computed(() => new Set(props.userFields))
@@ -116,9 +235,6 @@ const canInvadeText = computed(() => {
   }
   return `尚未满足（${inv.invaded}/${inv.total}）`
 })
-
-const isPlayerCity = computed(() => !!props.city && props.city.uid > 897)
-const isSelfCity = computed(() => !!props.city && props.city.uid === props.selfUid)
 
 function terrainName(type: number): string {
   switch (type) {
@@ -173,7 +289,14 @@ function render(): void {
   })
 }
 
-onMounted(render)
+onMounted(() => {
+  fitRows()
+  render()
+  window.addEventListener('resize', fitRows)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', fitRows)
+})
 watch(
   [
     () => props.cells,
@@ -279,10 +402,16 @@ const bubbleText = computed(() => {
   return `(坐标 ${coord.x + 1},${coord.y + 1})　${c.province}·${c.jun}　${terrainName(c.type)}`
 })
 
+// —— 出征任务枚举（原版 Ground_CampaignDialog_14..18：0运输/1派遣/2侦察/3掠夺/4占领）——
+// 后端 army.dispatch 仅接受 task∈{3掠夺,4占领}（service.go:789），且占领要求 target_type=1
+// （service.go:792 occupy_only_field）→ 城池目标（target_type=2）仅 掠夺(3) 可用，故只渲染该项。
+const CITY_TASKS: { task: number; name: string }[] = [{ task: 3, name: '掠夺' }]
+
 // —— 出征（复用 army dispatch：城池目标 target_type=2）——
 const showDispatch = ref(false)
 const showGovern = ref(false)
 const heroId = ref(0)
+const selectedTask = ref(0)
 const dispatchCounts = reactive<Record<number, number>>({})
 
 watch(
@@ -297,8 +426,9 @@ watch(
   { immediate: true },
 )
 
-function openDispatch(): void {
+function openDispatch(task: number): void {
   heroId.value = 0
+  selectedTask.value = task
   for (const s of props.soldiers) {
     dispatchCounts[s.sid] = 0
   }
@@ -320,7 +450,7 @@ function submitDispatch(): void {
   if (Object.keys(soldiers).length === 0) {
     return
   }
-  emit('dispatch', { hero_id: heroId.value, target_type: 2, target_id: cid, task: 3, soldiers })
+  emit('dispatch', { hero_id: heroId.value, target_type: 2, target_id: cid, task: selectedTask.value, soldiers })
   showDispatch.value = false
 }
 
@@ -343,9 +473,28 @@ function canBuild(): boolean {
   return !!c && c.type === 1 && c.ownercid === props.myCid && c.state === 0 && props.myCid > 0
 }
 
-function canGovern(): boolean {
-  return !!props.city && props.city.citytype > 0 && props.city.citytype < 5
-}
+// 目标操作可用性：原版 WorldActionDialog 按 flag 选 ViewStack 页（WorldActionDialog.as:2933-3014）。
+// flag 语义见 docs/SWF前端逻辑还原/08-世界地图.md §3.5。
+const cityOps = computed(() => {
+  const flag = props.city?.flag ?? -1
+  const citytype = props.city?.citytype ?? 0
+  return {
+    // 掠夺：flag4敌对盟/flag5 NPC可占/flag6个人宣战中/flag9；flag8联盟宣战等待中仅名城可攻（page5）。
+    canPlunder:
+      flag === 4 || flag === 5 || flag === 6 || flag === 9 || (flag === 8 && citytype > 0 && citytype !== 5),
+    // 宣战：仅「无小旗」flag7（page8）；敌对/已宣战状态下原版不提供宣战入口。
+    canWar: flag === 7,
+    // 治理：govern.visible=true 于 flag2..8（flag0/1/9 隐藏，WorldActionDialog.as:3019）；
+    // 且治理仅对名城（县城及以上）有效，故叠加 citytype 1..4。
+    canGovern: flag >= 2 && flag <= 8 && citytype > 0 && citytype < 5,
+    // 标记：原版 canMark()=User.canMark() && mCityType>0（WorldActionDialog.as:2427）；
+    // User.canMark()（联盟官职）前端无对应字段，故仅按 citytype>0 判定。
+    canMark: citytype > 0,
+  }
+})
+
+// 城池可出征任务：仅渲染后端 army.dispatch 确实支持的项（当前仅 掠夺）。
+const cityTaskButtons = computed(() => (cityOps.value.canPlunder ? CITY_TASKS : []))
 
 function onFavouriteToggle(): void {
   if (favEntry.value) {
@@ -404,7 +553,7 @@ const governTypes: { type: number; name: string }[] = [
 </script>
 
 <template>
-  <SkinDialog title="世界地图" wide :mask-closable="false" @close="emit('close')">
+  <SkinDialog title="世界地图" wide grow :mask-closable="false" @close="emit('close')">
     <div class="world-bar">
       <span class="label">视野</span>
       <span>{{ viewX }},{{ viewY }}</span>
@@ -439,13 +588,76 @@ const governTypes: { type: number; name: string }[] = [
             @mouseleave="onMouseLeave"
             @keydown="onKeydown"
           ></canvas>
+
+          <!-- 原版地图边框/侧边/底部装饰 + 四角（ditu_side / ditu_bottom / ditu_b1~b4），不拦截指针 -->
+          <span class="frame-edge frame-side-left" :style="{ backgroundImage: `url(${FRAME_IMGS.side})` }"></span>
+          <span class="frame-edge frame-side-right" :style="{ backgroundImage: `url(${FRAME_IMGS.side})` }"></span>
+          <span class="frame-edge frame-bottom" :style="{ backgroundImage: `url(${FRAME_IMGS.bottom})` }"></span>
+          <span class="frame-corner tl" :style="{ backgroundImage: `url(${FRAME_IMGS.corner1})` }"></span>
+          <span class="frame-corner tr" :style="{ backgroundImage: `url(${FRAME_IMGS.corner2})` }"></span>
+          <span class="frame-corner br" :style="{ backgroundImage: `url(${FRAME_IMGS.corner3})` }"></span>
+          <span class="frame-corner bl" :style="{ backgroundImage: `url(${FRAME_IMGS.corner4})` }"></span>
+
+          <!-- 关闭页签（ditu_close1/2）：复用既有 close 行为 -->
           <button
-            class="map-up"
+            class="frame-close"
             type="button"
-            title="地图上移"
-            :style="{ backgroundImage: `url(${mapUpUrl})` }"
-            @click="pan(0, -1)"
+            title="关闭地图"
+            :style="btnStyle(CLOSE_SKIN)"
+            @click="emit('close')"
           ></button>
+
+          <!-- 原版控制盘（map_controller 底图）+ 8 向三态方向按钮，点击沿用既有平移逻辑 -->
+          <div class="control-pad" :style="{ backgroundImage: `url(${controllerBg})` }">
+            <button
+              v-for="d in DIR_BUTTONS"
+              :key="d.key"
+              class="dir-btn"
+              :class="`dir-${d.key}`"
+              type="button"
+              :title="d.title"
+              :style="btnStyle(d)"
+              @click="pan(d.dx, d.dy)"
+            ></button>
+          </div>
+
+          <!-- 功能条（map_controller1_bg 底图）：定位我的城池（复用 goto-cid）/ 移动模式（无该模式，禁用） -->
+          <div class="controller-bar" :style="{ backgroundImage: `url(${controllerBarBg})` }">
+            <button
+              class="bar-btn mycity"
+              type="button"
+              title="定位我的城池"
+              :disabled="myCid <= 0"
+              :style="btnStyle(MYCITY_SKIN)"
+              @click="onMyCity"
+            ></button>
+            <button
+              class="bar-btn move"
+              type="button"
+              title="移动模式（当前版本未提供）"
+              disabled
+              :style="btnStyle(MOVE_SKIN)"
+            ></button>
+          </div>
+
+          <!-- 左右翻页（move_to_left/right 三态）：复用 view 事件，按一屏平移 -->
+          <button
+            class="page-btn page-left"
+            type="button"
+            title="左翻一屏"
+            :disabled="!canPageLeft"
+            :style="pageStyle(PAGE_LEFT_SKIN, canPageLeft)"
+            @click="pageLeft"
+          ></button>
+          <button
+            class="page-btn page-right"
+            type="button"
+            title="右翻一屏"
+            :disabled="!canPageRight"
+            :style="pageStyle(PAGE_RIGHT_SKIN, canPageRight)"
+            @click="pageRight"
+          ></button>
+
           <div v-if="hoverCell" class="bubble" :style="{ left: `${hoverPos.x + 12}px`, top: `${hoverPos.y + 12}px` }">
             {{ bubbleText }}
           </div>
@@ -507,28 +719,32 @@ const governTypes: { type: number; name: string }[] = [
 
                 <div class="actions">
                   <button
+                    v-for="t in cityTaskButtons"
+                    :key="t.task"
                     class="u-btn u-btn--red"
                     type="button"
-                    :disabled="busy || isSelfCity"
-                    @click="openDispatch"
+                    :disabled="busy"
+                    @click="openDispatch(t.task)"
                   >
-                    出征
+                    {{ t.name }}
                   </button>
-                  <button
-                    class="u-btn u-btn--red"
-                    type="button"
-                    :disabled="busy || !isPlayerCity || isSelfCity"
-                    @click="onWar"
-                  >
+                  <button v-if="cityOps.canWar" class="u-btn u-btn--red" type="button" :disabled="busy" @click="onWar">
                     宣战
                   </button>
-                  <button class="u-btn u-btn--gold" type="button" :disabled="busy" @click="emit('mark', city.cid)">
+                  <button
+                    v-if="cityOps.canMark"
+                    class="u-btn u-btn--gold"
+                    type="button"
+                    :disabled="busy"
+                    @click="emit('mark', city.cid)"
+                  >
                     标记城池
                   </button>
                   <button
+                    v-if="cityOps.canGovern"
                     class="u-btn u-btn--green"
                     type="button"
-                    :disabled="busy || !canGovern()"
+                    :disabled="busy"
                     @click="showGovern = !showGovern"
                   >
                     治理
@@ -536,7 +752,7 @@ const governTypes: { type: number; name: string }[] = [
                 </div>
 
                 <!-- 治理：先展示次数/上限（getGovernInfo）-->
-                <div v-if="canGovern() && showGovern" class="govern">
+                <div v-if="cityOps.canGovern && showGovern" class="govern">
                   <p class="u-hint">
                     {{ governInfo?.officename || '—' }} 今日已下达 {{ governInfo?.todayCount ?? 0 }} /
                     {{ governInfo?.maxCount ?? 0 }} 次
@@ -555,7 +771,7 @@ const governTypes: { type: number; name: string }[] = [
                   </div>
                 </div>
 
-                <!-- 出征：选择武将 + 兵力（复用 army dispatch，task=3 掠夺）-->
+                <!-- 出征：选择武将 + 兵力（复用 army dispatch；task 由上方任务按钮决定）-->
                 <div v-if="showDispatch" class="dispatch">
                   <div class="u-row">
                     <span class="label">随行武将</span>
@@ -709,24 +925,279 @@ const governTypes: { type: number; name: string }[] = [
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-.map-up {
+/* —— 原版地图边框（ditu_side / ditu_bottom / ditu_b1~b4）：装饰层不拦截指针 —— */
+.frame-edge,
+.frame-corner {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 35px;
-  height: 45px;
-  padding: 0;
-  border: none;
-  background: center / 100% 100% no-repeat;
+  z-index: 3;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
 }
 
-.map-up:active {
-  transform: translateY(1px);
+.frame-side-left,
+.frame-side-right {
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background-repeat: repeat-y;
+  background-size: 100% auto;
+}
+
+.frame-side-left {
+  left: 0;
+}
+
+.frame-side-right {
+  right: 0;
+}
+
+.frame-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+}
+
+.frame-corner {
+  width: 26px;
+  height: 26px;
+}
+
+.frame-corner.tl {
+  left: 0;
+  top: 0;
+}
+
+.frame-corner.tr {
+  right: 0;
+  top: 0;
+}
+
+.frame-corner.bl {
+  left: 0;
+  bottom: 0;
+}
+
+.frame-corner.br {
+  right: 0;
+  bottom: 0;
+}
+
+/* 关闭页签（ditu_close1/2）：复用面板关闭行为 */
+.frame-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 4;
+  width: 26px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  background-image: var(--btn-up);
+  cursor: pointer;
+}
+
+.frame-close:hover {
+  background-image: var(--btn-hl);
+}
+
+.frame-close:active {
+  background-image: var(--btn-dn);
+}
+
+/* —— 原版控制盘（map_controller 底图）+ 8 向三态方向按钮 —— */
+.control-pad {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 4;
+  width: 182px;
+  height: 132px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
+.dir-btn {
+  position: absolute;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  background-image: var(--btn-up);
+  cursor: pointer;
+}
+
+.dir-btn:hover {
+  background-image: var(--btn-hl);
+}
+
+.dir-btn:active {
+  background-image: var(--btn-dn);
+}
+
+.dir-up {
+  top: 2px;
+  left: 50%;
+  width: 43px;
+  height: 28px;
+  transform: translateX(-50%);
+}
+
+.dir-down {
+  bottom: 2px;
+  left: 50%;
+  width: 43px;
+  height: 28px;
+  transform: translateX(-50%);
+}
+
+.dir-left {
+  left: 2px;
+  top: 50%;
+  width: 28px;
+  height: 43px;
+  transform: translateY(-50%);
+}
+
+.dir-right {
+  right: 2px;
+  top: 50%;
+  width: 28px;
+  height: 43px;
+  transform: translateY(-50%);
+}
+
+.dir-upleft {
+  top: 6px;
+  left: 6px;
+  width: 41px;
+  height: 40px;
+}
+
+.dir-upright {
+  top: 6px;
+  right: 6px;
+  width: 41px;
+  height: 40px;
+}
+
+.dir-downleft {
+  bottom: 6px;
+  left: 6px;
+  width: 41px;
+  height: 40px;
+}
+
+.dir-downright {
+  bottom: 6px;
+  right: 6px;
+  width: 41px;
+  height: 40px;
+}
+
+/* —— 功能条（map_controller1_bg 底图）：我的城池 / 移动模式 —— */
+.controller-bar {
+  position: absolute;
+  left: 10px;
+  bottom: 148px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 150px;
+  height: 28px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
+.bar-btn {
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  background-image: var(--btn-up);
+  cursor: pointer;
+}
+
+.bar-btn:hover:enabled {
+  background-image: var(--btn-hl);
+}
+
+.bar-btn:active:enabled {
+  background-image: var(--btn-dn);
+}
+
+.bar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bar-btn.mycity {
+  width: 34px;
+  height: 28px;
+}
+
+.bar-btn.move {
+  width: 42px;
+  height: 23px;
+}
+
+/* —— 左右翻页（move_to_left/right 三态，禁用态用 *_disbaled）—— */
+.page-btn {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  width: 29px;
+  height: 117px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  background-image: var(--btn-up);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.page-btn:hover:enabled {
+  background-image: var(--btn-hl);
+}
+
+.page-btn:active:enabled {
+  background-image: var(--btn-dn);
+}
+
+.page-btn:disabled {
+  cursor: not-allowed;
+}
+
+.page-left {
+  left: 6px;
+}
+
+.page-right {
+  right: 6px;
 }
 
 .bubble {
   position: absolute;
-  z-index: 2;
+  z-index: 5;
   padding: 2px 6px;
   white-space: nowrap;
   font-size: 12px;

@@ -77,7 +77,9 @@ func CityResourceFromMap(m map[string]any) CityResource {
 	}
 }
 
-// Alarm 新库无告警表，恒为零值。
+// Alarm 对齐 legacy sys_alarm 的顶栏红点字段（前端 api/city.ts::Alarm）。
+// 新库 alarms(user_id, task, report)：Task=是否有可领取任务(task)，Mail=未读战报(report)
+//（旧库 mail=未读系统邮件；新库无邮件子系统，见 city.alarmOf 说明）。
 type Alarm struct {
 	UID  int `json:"uid"`
 	Task int `json:"task"`

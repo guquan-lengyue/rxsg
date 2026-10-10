@@ -3,7 +3,7 @@
 // 驻军走 GET /cities/:cid/troops；城防器械走 GET /cities/:cid/defences（后端当前恒返回空数组）。
 // 城墙耐久后端未暴露（cities 表无 wallhp 列、city handler 响应无城墙字段），此面板不伪造数值。
 import SkinDialog from '@/components/SkinDialog.vue'
-import { soldierIcon } from '@/assets/img'
+import { img, soldierIcon } from '@/assets/img'
 import type { CityDefence, CitySoldier } from '@/types'
 
 defineProps<{
@@ -15,7 +15,7 @@ defineProps<{
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 
-// 城防器械名对齐 cfg_defence（did 1..5）。
+// 城防器械名对齐 cfg_defence（did 1..5），仅用于越界 did 与图标 alt。
 const DEFENCE_NAMES: Record<number, string> = {
   1: '陷阱',
   2: '拒马',
@@ -27,6 +27,17 @@ const DEFENCE_NAMES: Record<number, string> = {
 function defenceName(did: number): string {
   return DEFENCE_NAMES[did] ?? `器械${did}`
 }
+
+// did 1..5 用图标展示；越界 did 回退 defence_0.png 并保留中文名。
+function defenceIcon(did: number): string {
+  return did >= 1 && did <= 5 ? img(`defence_${did}.png`) : img('defence_0.png')
+}
+
+function showDefenceName(did: number): boolean {
+  return did < 1 || did > 5
+}
+
+const WALL_ICON = img('defence_wall.png')
 </script>
 
 <template>
@@ -46,16 +57,23 @@ function defenceName(did: number): string {
       </ul>
 
       <h4 class="block-title">城防器械</h4>
-      <p v-if="!defences.length" class="u-hint">暂无城防器械</p>
+      <p v-if="!defences.length" class="u-hint">
+        <img class="defence-icon" :src="defenceIcon(0)" alt="暂无城防器械" />
+        暂无城防器械
+      </p>
       <ul v-else class="grid">
         <li v-for="d in defences" :key="d.did" class="cell">
-          <span class="name">{{ defenceName(d.did) }}</span>
+          <img class="defence-icon" :src="defenceIcon(d.did)" :alt="defenceName(d.did)" />
+          <span v-if="showDefenceName(d.did)" class="name">{{ defenceName(d.did) }}</span>
           <strong class="count">{{ d.count }}</strong>
         </li>
       </ul>
 
       <h4 class="block-title">城墙耐久</h4>
-      <p class="u-hint">城墙耐久暂未由后端提供。</p>
+      <p class="u-hint">
+        <img class="defence-icon" :src="WALL_ICON" alt="城墙" />
+        城墙耐久暂未由后端提供。
+      </p>
     </template>
 
     <template #footer>
@@ -107,12 +125,25 @@ function defenceName(did: number): string {
   background: var(--panel);
 }
 
+/* 城防器械 / 城墙图标（defence_*.png 40x32） */
+.defence-icon {
+  width: 40px;
+  height: 32px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.u-hint .defence-icon {
+  margin-right: 6px;
+}
+
 .name {
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .count {
+  margin-left: auto;
   color: var(--accent);
 }
 </style>

@@ -51,6 +51,11 @@ export function armor(id: number): string {
   return img(`armor/${id}.png`)
 }
 
+/** 道具图标：images/item_{gid}.png（原版 Goods/SmallItem.as：`images/item_" + gid + ".png"`）。 */
+export function itemIcon(gid: number): string {
+  return img(`item_${gid}.png`)
+}
+
 /** 地形图：images/view_terrain_{id}.png。 */
 export function terrain(id: number | string): string {
   return img(`view_terrain_${id}.png`)

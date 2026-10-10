@@ -163,3 +163,165 @@ button:disabled {
   max-height: 60vh;
   overflow-y: auto;
 }
+
+/* ---- R0 视觉基座：追加皮肤类（原版贴图；只追加，不改既有规则） ----
+   约定：九宫格/面板类统一用 border-image（切片风格对齐既有 .u-modal / .u-title）；
+   图标/贴图类用 background: url(...) center / 100% 100% no-repeat。
+   注意：.u-hint 已被既有面板用作「提示文字」工具类（见上），
+   故 board_hint 的面板边框另立 .u-hint-box，避免改动既有面板观感。 */
+
+/* 悬浮提示板 board_tip.png（原版 .Tip / .BoardFloat / ToolTip borderSkin）。 */
+.u-tip {
+  border: 8px solid transparent;
+  border-image: url('/images/board_tip.png') 6 6 6 6 fill / 8px round;
+  background: transparent;
+}
+
+/* 面板边框 board_hint.png（原版 .Panel borderSkin）。
+   注：不占用既有 .u-hint（提示文字），面板方框请用 .u-hint-box。 */
+.u-hint-box {
+  border: 10px solid transparent;
+  border-image: url('/images/board_hint.png') 8 8 8 8 fill / 10px round;
+  background: transparent;
+}
+
+/* 文本输入底 board_input.png（原版 .BoardTextInput）。 */
+.u-input {
+  padding: 3px 8px;
+  color: var(--text);
+  border: 7px solid transparent;
+  border-image: url('/images/board_input.png') 6 6 6 6 fill / 7px round;
+  background: transparent;
+}
+
+/* 面板底 panel_background.png（原版 panel_background）。 */
+.u-panel {
+  border: 12px solid transparent;
+  border-image: url('/images/panel_background.png') 12 12 12 12 fill / 12px round;
+  background: transparent;
+}
+
+/* 小面板底 panel_background_small.png。 */
+.u-panel--small {
+  border: 12px solid transparent;
+  border-image: url('/images/panel_background_small.png') 12 12 12 12 fill / 12px round;
+  background: transparent;
+}
+
+/* 跑马灯/公告底 alertPanel_bg.png（原版 AlertPanel）。 */
+.u-alert {
+  border: 8px solid transparent;
+  border-image: url('/images/alertPanel_bg.png') 8 8 8 8 fill / 8px round;
+  background: transparent;
+}
+
+/* ---- 按钮补全（三态贴图；与 .u-btn 基类配合使用） ---- */
+
+/* null/禁用皮（原版 nullSkin）。button_null 无 _hl/_pr，hover/active 同图。 */
+.u-btn--null { background-image: url('/images/button_null.png'); }
+.u-btn--null:hover:not(:disabled),
+.u-btn--null:active:not(:disabled) { background-image: url('/images/button_null.png'); }
+
+.u-btn--close { background-image: url('/images/button_close.png'); }
+.u-btn--close:hover:not(:disabled) { background-image: url('/images/button_close_hl.png'); }
+.u-btn--close:active:not(:disabled) { background-image: url('/images/button_close_pr.png'); }
+
+.u-btn--return { background-image: url('/images/button_return.png'); }
+.u-btn--return:hover:not(:disabled) { background-image: url('/images/button_return_hl.png'); }
+.u-btn--return:active:not(:disabled) { background-image: url('/images/button_return_pr.png'); }
+
+.u-btn--search { background-image: url('/images/button_search.png'); }
+.u-btn--search:hover:not(:disabled) { background-image: url('/images/button_search_hl.png'); }
+.u-btn--search:active:not(:disabled) { background-image: url('/images/button_search_pr.png'); }
+
+/* clear / maximum 按下态贴图为 _down（原版命名）。 */
+.u-btn--clear { background-image: url('/images/button_clear.png'); }
+.u-btn--clear:hover:not(:disabled) { background-image: url('/images/button_clear_hl.png'); }
+.u-btn--clear:active:not(:disabled) { background-image: url('/images/button_clear_down.png'); }
+
+.u-btn--maximum { background-image: url('/images/button_maximum.png'); }
+.u-btn--maximum:hover:not(:disabled) { background-image: url('/images/button_maximum_hl.png'); }
+.u-btn--maximum:active:not(:disabled) { background-image: url('/images/button_maximum_down.png'); }
+
+/* ---- 列表项（list_normal / list_over / list_down 三态） ---- */
+
+.u-list-item {
+  padding: 3px 8px;
+  font-size: 13px;
+  background: url('/images/list_normal.png') center / 100% 100% no-repeat;
+}
+
+.u-list-item:hover {
+  background-image: url('/images/list_over.png');
+}
+
+.u-list-item.is-active {
+  background-image: url('/images/list_down.png');
+}
+
+/* ---- 表格（贴图分隔线：表头 table_headerline，内容行 table_contentline / _2） ---- */
+
+.u-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.u-table--lined > thead > tr > th {
+  padding: 4px 8px;
+  color: var(--accent);
+  font-weight: 600;
+  background: url('/images/table_headerline.png') left bottom / auto auto repeat-x;
+}
+
+.u-table--lined > tbody > tr > td {
+  padding: 4px 8px;
+  background: url('/images/table_contentline.png') left bottom / auto auto repeat-x;
+}
+
+.u-table--lined > tbody > tr > td + td {
+  background-image: url('/images/table_contentline.png'), url('/images/table_contentline2.png');
+  background-position: left bottom, left top;
+  background-repeat: repeat-x, repeat-y;
+}
+
+/* ---- 下拉框 / 数字步进（原版 ComboBox / NumericStepper） ---- */
+
+.u-select {
+  background: url('/images/combobox_up.png') center / 100% 100% no-repeat;
+}
+
+.u-select.is-open {
+  background-image: url('/images/combobox_down.png');
+}
+
+.u-stepper {
+  background: url('/images/numericstepper_text.png') center / 100% 100% no-repeat;
+}
+
+/* ---- 页签 channel_tab1..5（常态 / _hl hover / _sl 选中 / _slhl 选中hover） ---- */
+
+.u-tab--1 { background-image: url('/images/channel_tab1.png'); }
+.u-tab--1:hover { background-image: url('/images/channel_tab1_hl.png'); }
+.u-tab--1.is-active { background-image: url('/images/channel_tab1_sl.png'); }
+.u-tab--1.is-active:hover { background-image: url('/images/channel_tab1_slhl.png'); }
+
+.u-tab--2 { background-image: url('/images/channel_tab2.png'); }
+.u-tab--2:hover { background-image: url('/images/channel_tab2_hl.png'); }
+.u-tab--2.is-active { background-image: url('/images/channel_tab2_sl.png'); }
+.u-tab--2.is-active:hover { background-image: url('/images/channel_tab2_slhl.png'); }
+
+.u-tab--3 { background-image: url('/images/channel_tab3.png'); }
+.u-tab--3:hover { background-image: url('/images/channel_tab3_hl.png'); }
+.u-tab--3.is-active { background-image: url('/images/channel_tab3_sl.png'); }
+.u-tab--3.is-active:hover { background-image: url('/images/channel_tab3_slhl.png'); }
+
+.u-tab--4 { background-image: url('/images/channel_tab4.png'); }
+.u-tab--4:hover { background-image: url('/images/channel_tab4_hl.png'); }
+.u-tab--4.is-active { background-image: url('/images/channel_tab4_sl.png'); }
+.u-tab--4.is-active:hover { background-image: url('/images/channel_tab4_slhl.png'); }
+
+.u-tab--5 { background-image: url('/images/channel_tab5.png'); }
+.u-tab--5:hover { background-image: url('/images/channel_tab5_hl.png'); }
+.u-tab--5.is-active { background-image: url('/images/channel_tab5_sl.png'); }
+.u-tab--5.is-active:hover { background-image: url('/images/channel_tab5_slhl.png'); }
