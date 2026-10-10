@@ -102,6 +102,47 @@ export interface BuildingDetail {
   next: UpgradeInfo | null
 }
 
+// 建造前置条件（对齐后端 building.UpgradeCond，字段名逐字对齐）。
+export interface UpgradeCondition {
+  type: string
+  upgradeNeed: string
+  currentOwn: string
+  canUpgrade: boolean
+}
+
+// 建造候选（对齐后端 building.BuildingCandidate，字段名逐字对齐）。
+export interface BuildingCandidate {
+  bid: number
+  name: string
+  description: string
+  levelDescription: string
+  level: number
+  woodNeed: number
+  rockNeed: number
+  ironNeed: number
+  foodNeed: number
+  goldNeed: number
+  peopleNeed: number
+  upgradeTime: number
+  canUpgrade: boolean
+  conditions: UpgradeCondition[]
+}
+
+// 建筑队列项（对齐后端 building.QueueItem，字段名逐字对齐）。
+export interface BuildingQueueItem {
+  cid: number
+  bid: number
+  bname: string
+  x: number
+  y: number
+  state: number
+  task: string
+  current_level: number
+  target_level: number
+  state_endtime: number
+  state_timeleft: number
+}
+
 export interface Technic {
   tid: number
   level: number

@@ -34,6 +34,14 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	g.POST("/open-hole", h.openHole)
 	g.POST("/embed", h.embed)
 
+	// R11-3 新增（1:1 复刻 legacy BarnFunc.php 马厩/坐骑批次）：
+	g.POST("/barn/goods", h.barnGoods)                 // loadBarnGoods（BarnFunc.php:5）
+	g.POST("/barn/zuoji-armors", h.barnZuojiArmors)    // loadZuojiArmor（BarnFunc.php:19）
+	g.POST("/barn/unlade", h.barnUnlade)               // doUnlade（BarnFunc.php:30）
+	g.POST("/barn/embed-pearls", h.barnEmbedPearls)    // loadEmbedPearlByArmor（EquipmentFunc.php:859）
+	g.GET("/barn/unactive-horse", h.barnUnactiveHorse) // loadUnActiveHorseArmor（EquipmentFunc.php:12）
+	g.POST("/upgrade", h.upgradeArmor)                 // doUpgradeArmor（ArmorFunc.php:1190）
+
 	rg.GET("/heroes/:hid/armors", h.heroArmors)
 }
 
@@ -345,6 +353,132 @@ func (h *Handler) openHole(c *gin.Context) {
 	err := h.svc.WithUserLock(c.Request.Context(), uid, "armor", func(ctx context.Context) error {
 		var err error
 		out, err = h.svc.OpenHole(ctx, uid, req.SID, req.GID, req.Pos, req.UseType, req.Count)
+		return err
+	})
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// ── R11-3 马厩/坐骑端点（参数序对齐 legacy array_shift）──────────────────────
+
+// barnGoodsReq loadBarnGoods(xilianIndex)：0/1/2。
+type barnGoodsReq struct {
+	XilianIndex int `json:"xilian_index"`
+}
+
+func (h *Handler) barnGoods(c *gin.Context) {
+	var req barnGoodsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	uid := uidOf(c)
+	out, err := h.svc.LoadBarnGoods(c.Request.Context(), uid, req.XilianIndex)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// barnZuojiReq loadZuojiArmor(zuoji_type, armorid)。
+type barnZuojiReq struct {
+	ZuojiType int `json:"zuoji_type"`
+	ArmorID   int `json:"armorid"`
+}
+
+func (h *Handler) barnZuojiArmors(c *gin.Context) {
+	var req barnZuojiReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	uid := uidOf(c)
+	out, err := h.svc.LoadZuojiArmor(c.Request.Context(), uid, req.ZuojiType, req.ArmorID)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// barnUnladeReq doUnlade(sid, gid, pos)。
+type barnUnladeReq struct {
+	SID int `json:"sid"`
+	GID int `json:"gid"`
+	Pos int `json:"pos"`
+}
+
+func (h *Handler) barnUnlade(c *gin.Context) {
+	var req barnUnladeReq
+	if err := c.ShouldBindJSON(&req); err != nil || req.SID <= 0 || req.GID <= 0 {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	uid := uidOf(c)
+	var out *UnladeResult
+	err := h.svc.WithUserLock(c.Request.Context(), uid, "armor", func(ctx context.Context) error {
+		var err error
+		out, err = h.svc.DoUnlade(ctx, uid, req.SID, req.GID, req.Pos)
+		return err
+	})
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// barnEmbedPearlsReq loadEmbedPearlByArmor(gidstr)。
+type barnEmbedPearlsReq struct {
+	GIDStr string `json:"gid_str"`
+}
+
+func (h *Handler) barnEmbedPearls(c *gin.Context) {
+	var req barnEmbedPearlsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	uid := uidOf(c)
+	out, err := h.svc.LoadEmbedPearlByArmor(c.Request.Context(), uid, req.GIDStr)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+func (h *Handler) barnUnactiveHorse(c *gin.Context) {
+	uid := uidOf(c)
+	out, err := h.svc.LoadUnActiveHorseArmor(c.Request.Context(), uid)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// upgradeArmorReq doUpgradeArmor(sid, isProtected)。
+type upgradeArmorReq struct {
+	SID         int  `json:"sid"`
+	IsProtected bool `json:"is_protected"`
+}
+
+func (h *Handler) upgradeArmor(c *gin.Context) {
+	var req upgradeArmorReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	uid := uidOf(c)
+	var out *UpgradeArmorResult
+	err := h.svc.WithUserLock(c.Request.Context(), uid, "armor", func(ctx context.Context) error {
+		var err error
+		out, err = h.svc.DoUpgradeArmor(ctx, uid, req.SID, req.IsProtected)
 		return err
 	})
 	if err != nil {

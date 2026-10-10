@@ -28,6 +28,8 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	g.POST("/expr/cancel", h.cancelExpr)
 	g.POST("/expr/faster", h.fasterExpr)
 	g.POST("/office", h.office)
+	// R11-3：官署面板聚合读取（OfficeFunc.php getOfficeInfo + doGetOfficeValidPosition）。
+	rg.GET("/cities/:cid/office", h.officeInfo)
 }
 
 func cidOf(c *gin.Context) (int, bool) {
@@ -194,4 +196,18 @@ func (h *Handler) office(c *gin.Context) {
 	h.locked(c, "hero_office", func(ctx context.Context) (*Info, error) {
 		return h.svc.SetChief(ctx, c.GetInt(auth.CtxUID), cid, req.Sets)
 	})
+}
+
+// officeInfo 官署面板聚合（GET /cities/:cid/office）。
+func (h *Handler) officeInfo(c *gin.Context) {
+	cid, ok := cidOf(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.OfficeInfo(c.Request.Context(), c.GetInt(auth.CtxUID), cid)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
 }

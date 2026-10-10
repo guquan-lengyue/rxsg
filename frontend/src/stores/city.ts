@@ -6,10 +6,12 @@ import type { CityProduct, LevyResult, PacifyResult, ProductRatePayload } from '
 import type {
   ArmyInfo,
   Building,
+  BuildingCandidate,
   BuildingDetail,
+  BuildingQueueItem,
   City,
-  CityDetail,
   CityDefence,
+  CityDetail,
   CityResource,
   CitySoldier,
   DispatchPayload,
@@ -29,6 +31,7 @@ export const useCityStore = defineStore('city', () => {
   const detail = ref<CityDetail | null>(null)
   const resources = ref<CityResource | null>(null)
   const buildings = ref<Building[]>([])
+  const buildingQueue = ref<BuildingQueueItem[]>([])
   const technicInfo = ref<TechnicInfo | null>(null)
   const armyInfo = ref<ArmyInfo | null>(null)
   const fields = ref<Field[]>([])
@@ -52,6 +55,7 @@ export const useCityStore = defineStore('city', () => {
     currentCity.value = d.city
     resources.value = d.base.resource
     buildings.value = d.buildings
+    buildingQueue.value = []
     technicInfo.value = null
     armyInfo.value = null
     fields.value = []
@@ -102,6 +106,84 @@ export const useCityStore = defineStore('city', () => {
     buildings.value = await cityApi.stopBuilding(cid, bid, x, y)
     resources.value = await cityApi.getResources(cid)
     return cityApi.getBuildingDetail(cid, bid, x, y)
+  }
+
+  // —— 建筑：建造 / 拆除 / 彻底拆除 / 取消拆除 / 资源地转换 / 队列 ——
+
+  // 建造候选列表为只读查询，不落库；由 CityView 暂存后交给 BuildDialog 展示。
+  async function loadValidBuildings(cid: number, inner: number): Promise<BuildingCandidate[]> {
+    return cityApi.validBuildings(cid, inner)
+  }
+
+  // 建造/拆除系列接口成功后端返回整份建筑列表，同步刷新资源与建筑队列。
+  async function createBuilding(
+    cid: number,
+    bid: number,
+    inner: number,
+    x: number,
+    y: number,
+  ): Promise<Building[]> {
+    buildings.value = await cityApi.createBuilding(cid, bid, inner, x, y)
+    resources.value = await cityApi.getResources(cid)
+    buildingQueue.value = await cityApi.buildingQueue(cid)
+    return buildings.value
+  }
+
+  async function destroyBuilding(
+    cid: number,
+    bid: number,
+    inner: number,
+    x: number,
+    y: number,
+  ): Promise<Building[]> {
+    buildings.value = await cityApi.destroyBuilding(cid, bid, inner, x, y)
+    resources.value = await cityApi.getResources(cid)
+    buildingQueue.value = await cityApi.buildingQueue(cid)
+    return buildings.value
+  }
+
+  async function destroyAllBuilding(
+    cid: number,
+    bid: number,
+    inner: number,
+    x: number,
+    y: number,
+  ): Promise<Building[]> {
+    buildings.value = await cityApi.destroyAllBuilding(cid, bid, inner, x, y)
+    resources.value = await cityApi.getResources(cid)
+    buildingQueue.value = await cityApi.buildingQueue(cid)
+    return buildings.value
+  }
+
+  async function cancelDestroyBuilding(
+    cid: number,
+    bid: number,
+    inner: number,
+    x: number,
+    y: number,
+  ): Promise<Building[]> {
+    buildings.value = await cityApi.cancelDestroyBuilding(cid, bid, inner, x, y)
+    buildingQueue.value = await cityApi.buildingQueue(cid)
+    return buildings.value
+  }
+
+  async function exchangeBuilding(
+    cid: number,
+    bid: number,
+    targetbid: number,
+    inner: number,
+    x: number,
+    y: number,
+  ): Promise<Building[]> {
+    buildings.value = await cityApi.exchangeBuilding(cid, bid, targetbid, inner, x, y)
+    resources.value = await cityApi.getResources(cid)
+    buildingQueue.value = await cityApi.buildingQueue(cid)
+    return buildings.value
+  }
+
+  async function loadBuildingQueue(cid: number): Promise<BuildingQueueItem[]> {
+    buildingQueue.value = await cityApi.buildingQueue(cid)
+    return buildingQueue.value
   }
 
   async function loadTechnicInfo(cid: number): Promise<TechnicInfo> {
@@ -301,6 +383,8 @@ export const useCityStore = defineStore('city', () => {
       void refreshResources(cid)
       // 建筑/科技等到期结算由后端惰性触发，心跳带上建筑列表以刷新等级与状态。
       void refreshBuildings(cid)
+      // 建筑队列条常驻顶栏，随心跳刷新（到期结算由后端惰性触发）。
+      void loadBuildingQueue(cid)
       // 科技面板打开过才刷新，避免无谓请求。
       if (technicInfo.value) {
         void loadTechnicInfo(cid)
@@ -334,6 +418,7 @@ export const useCityStore = defineStore('city', () => {
     detail,
     resources,
     buildings,
+    buildingQueue,
     technicInfo,
     armyInfo,
     fields,
@@ -350,6 +435,13 @@ export const useCityStore = defineStore('city', () => {
     loadBuildingDetail,
     upgradeBuilding,
     stopBuilding,
+    loadValidBuildings,
+    createBuilding,
+    destroyBuilding,
+    destroyAllBuilding,
+    cancelDestroyBuilding,
+    exchangeBuilding,
+    loadBuildingQueue,
     loadTechnicInfo,
     upgradeTechnic,
     stopTechnic,

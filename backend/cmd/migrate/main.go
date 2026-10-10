@@ -55,6 +55,7 @@ func main() {
 		"migrations/0014_m11_world.sql",
 		"migrations/0015_m12_building.sql",
 		"migrations/0016_m12b_defence.sql",
+		"migrations/0017_m13_office_barn.sql",
 		"migrations/0004_seed_normalized.sql",
 	}
 	for _, f := range files {

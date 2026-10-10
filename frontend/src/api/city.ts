@@ -4,7 +4,9 @@ import type {
   Alarm,
   ArmyInfo,
   Building,
+  BuildingCandidate,
   BuildingDetail,
+  BuildingQueueItem,
   City,
   CityDefence,
   CityDetail,
@@ -69,6 +71,110 @@ export async function stopBuilding(
   y: number,
 ): Promise<Building[]> {
   const { data } = await http.post<Building[]>(`/cities/${cid}/buildings/stop`, { bid, x, y })
+  return data
+}
+
+// —— 建筑：建造 / 拆除 / 彻底拆除 / 取消拆除 / 资源地转换 / 队列 ——
+// 对齐 backend/internal/building/handler.go 与 build.go（请求体字段名逐字对齐）。
+
+/** 建造候选列表（GET /cities/:cid/buildings/valid?inner=0|1|2；inner 必填）。 */
+export async function validBuildings(cid: number, inner: number): Promise<BuildingCandidate[]> {
+  const { data } = await http.get<BuildingCandidate[]>(`/cities/${cid}/buildings/valid`, {
+    params: { inner },
+  })
+  return data
+}
+
+/** 建造新建筑（POST /cities/:cid/buildings/create，body {bid,inner,x,y}）。 */
+export async function createBuilding(
+  cid: number,
+  bid: number,
+  inner: number,
+  x: number,
+  y: number,
+): Promise<Building[]> {
+  const { data } = await http.post<Building[]>(`/cities/${cid}/buildings/create`, {
+    bid,
+    inner,
+    x,
+    y,
+  })
+  return data
+}
+
+/** 拆除一级（POST /cities/:cid/buildings/destroy，body {bid,inner,x,y}）。 */
+export async function destroyBuilding(
+  cid: number,
+  bid: number,
+  inner: number,
+  x: number,
+  y: number,
+): Promise<Building[]> {
+  const { data } = await http.post<Building[]>(`/cities/${cid}/buildings/destroy`, {
+    inner,
+    x,
+    y,
+    bid,
+  })
+  return data
+}
+
+/** 彻底拆除（POST /cities/:cid/buildings/destroy-all，body {bid,inner,x,y}）。 */
+export async function destroyAllBuilding(
+  cid: number,
+  bid: number,
+  inner: number,
+  x: number,
+  y: number,
+): Promise<Building[]> {
+  const { data } = await http.post<Building[]>(`/cities/${cid}/buildings/destroy-all`, {
+    inner,
+    x,
+    y,
+    bid,
+  })
+  return data
+}
+
+/** 取消拆除（POST /cities/:cid/buildings/cancel-destroy，body {bid,inner,x,y}）。 */
+export async function cancelDestroyBuilding(
+  cid: number,
+  bid: number,
+  inner: number,
+  x: number,
+  y: number,
+): Promise<Building[]> {
+  const { data } = await http.post<Building[]>(`/cities/${cid}/buildings/cancel-destroy`, {
+    inner,
+    x,
+    y,
+    bid,
+  })
+  return data
+}
+
+/** 资源地转换（POST /cities/:cid/buildings/exchange，body {bid,targetbid,inner,x,y}）。 */
+export async function exchangeBuilding(
+  cid: number,
+  bid: number,
+  targetbid: number,
+  inner: number,
+  x: number,
+  y: number,
+): Promise<Building[]> {
+  const { data } = await http.post<Building[]>(`/cities/${cid}/buildings/exchange`, {
+    inner,
+    x,
+    y,
+    bid,
+    targetbid,
+  })
+  return data
+}
+
+/** 建筑队列（GET /cities/:cid/buildings/queue）。 */
+export async function buildingQueue(cid: number): Promise<BuildingQueueItem[]> {
+  const { data } = await http.get<BuildingQueueItem[]>(`/cities/${cid}/buildings/queue`)
   return data
 }
 

@@ -5,7 +5,10 @@ import { buildingAt, CELL_SIZE, drawCityGrid } from '@/render/cityGrid'
 import type { Building } from '@/types'
 
 const props = defineProps<{ buildings: Building[]; selected?: Building | null }>()
-const emit = defineEmits<{ (e: 'select', b: Building): void }>()
+const emit = defineEmits<{
+  (e: 'select', b: Building): void
+  (e: 'select-empty', pos: { x: number; y: number }): void
+}>()
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 let timer: number | null = null
@@ -24,6 +27,13 @@ function onClick(event: MouseEvent): void {
   const hit = buildingAt(props.buildings, event.offsetX, event.offsetY, CELL_SIZE)
   if (hit) {
     emit('select', hit)
+    return
+  }
+  // 空地格：把像素坐标换算为格子（画布尺寸 = 列/行数 × CELL_SIZE，offsetX/Y 恒在画布内）。
+  const x = Math.floor(event.offsetX / CELL_SIZE)
+  const y = Math.floor(event.offsetY / CELL_SIZE)
+  if (x >= 0 && y >= 0) {
+    emit('select-empty', { x, y })
   }
 }
 

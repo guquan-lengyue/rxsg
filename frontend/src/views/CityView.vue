@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 
 import BuildingGrid from '@/components/BuildingGrid.vue'
 import BuildingPanel from '@/components/BuildingPanel.vue'
+import BuildDialog from '@/components/BuildDialog.vue'
+import BuildingExchangeDialog from '@/components/BuildingExchangeDialog.vue'
+import BuildingQueueBar from '@/components/BuildingQueueBar.vue'
 import ArmyPanel from '@/components/ArmyPanel.vue'
 import ArmorPanel from '@/components/ArmorPanel.vue'
 import HeroPanel from '@/components/HeroPanel.vue'
@@ -46,7 +49,7 @@ import { useAchievementStore } from '@/stores/achievement'
 import { useLotteryStore } from '@/stores/lottery'
 import { usePkStore } from '@/stores/pk'
 import { useWorldStore } from '@/stores/world'
-import type { Building, BuildingDetail, DispatchPayload } from '@/types'
+import type { Building, BuildingCandidate, BuildingDetail, DispatchPayload } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -71,6 +74,21 @@ const buildingDetail = ref<BuildingDetail | null>(null)
 const panelLoading = ref(false)
 const panelError = ref('')
 const busy = ref(false)
+
+// 建造面板状态（点击内城空地格打开）。inner 传 0（对齐 cfg_buildings 中资源田 inner=0；valid?inner=0
+// 与 create 的 cfg 校验一致，可建造农田/伐木场/采石场/铁矿）。
+const BUILD_INNER = 0
+const showBuild = ref(false)
+const buildCandidates = ref<BuildingCandidate[]>([])
+const buildLoading = ref(false)
+const buildError = ref('')
+const buildBusy = ref(false)
+const buildCell = ref<{ x: number; y: number } | null>(null)
+
+// 资源地转换面板状态
+const showExchange = ref(false)
+const exchangeBusy = ref(false)
+const exchangeError = ref('')
 
 // 科技面板状态
 const showTechnics = ref(false)
@@ -1280,11 +1298,35 @@ async function refreshSelectedDetail(): Promise<void> {
   if (!b || !activeCid.value || busy.value) {
     return
   }
+  // 位置上的建筑可能被拆除移除或资源地转换（bid 变化）→ 以最新列表为准。
+  const fresh = city.buildings.find((it) => it.x === b.x && it.y === b.y)
+  if (!fresh) {
+    closePanel()
+    return
+  }
+  selected.value = fresh
   try {
-    buildingDetail.value = await city.loadBuildingDetail(activeCid.value, b.bid, b.x, b.y)
+    buildingDetail.value = await city.loadBuildingDetail(activeCid.value, fresh.bid, fresh.x, fresh.y)
   } catch (e) {
     panelError.value = errorMessage(e)
   }
+}
+
+// 建筑写操作统一包裹：成功后刷新建筑列表（store 已回写）与当前详情。
+async function runBuildingWrite(fn: () => Promise<unknown>): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  busy.value = true
+  panelError.value = ''
+  try {
+    await fn()
+  } catch (e) {
+    panelError.value = errorMessage(e)
+  } finally {
+    busy.value = false
+  }
+  await refreshSelectedDetail()
 }
 
 async function onUpgrade(): Promise<void> {
@@ -1319,10 +1361,118 @@ async function onStop(): Promise<void> {
   }
 }
 
+// —— 建造（点击空地格 → 候选列表 → 二次确认 → 建造）——
+
+async function onSelectEmpty(pos: { x: number; y: number }): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  buildCell.value = pos
+  buildCandidates.value = []
+  buildError.value = ''
+  buildLoading.value = true
+  showBuild.value = true
+  try {
+    buildCandidates.value = await city.loadValidBuildings(activeCid.value, BUILD_INNER)
+  } catch (e) {
+    buildError.value = errorMessage(e)
+  } finally {
+    buildLoading.value = false
+  }
+}
+
+function closeBuild(): void {
+  showBuild.value = false
+  buildCandidates.value = []
+  buildError.value = ''
+  buildBusy.value = false
+  buildCell.value = null
+}
+
+async function onBuild(bid: number): Promise<void> {
+  const cell = buildCell.value
+  if (!cell || !activeCid.value) {
+    return
+  }
+  buildBusy.value = true
+  buildError.value = ''
+  try {
+    await city.createBuilding(activeCid.value, bid, BUILD_INNER, cell.x, cell.y)
+    closeBuild()
+  } catch (e) {
+    // 资源不足等业务文案由后端 message 原样展示。
+    buildError.value = errorMessage(e)
+  } finally {
+    buildBusy.value = false
+  }
+}
+
+// —— 拆除 / 彻底拆除 / 取消拆除 ——
+
+function onDestroy(): void {
+  const b = selected.value
+  if (!b || !activeCid.value) {
+    return
+  }
+  void runBuildingWrite(() => city.destroyBuilding(activeCid.value, b.bid, BUILD_INNER, b.x, b.y))
+}
+
+function onDestroyAll(): void {
+  const b = selected.value
+  if (!b || !activeCid.value) {
+    return
+  }
+  void runBuildingWrite(() => city.destroyAllBuilding(activeCid.value, b.bid, BUILD_INNER, b.x, b.y))
+}
+
+function onCancelDestroy(): void {
+  const b = selected.value
+  if (!b || !activeCid.value) {
+    return
+  }
+  void runBuildingWrite(() =>
+    city.cancelDestroyBuilding(activeCid.value, b.bid, BUILD_INNER, b.x, b.y),
+  )
+}
+
+// —— 资源地转换 ——
+
+function openExchange(): void {
+  if (!buildingDetail.value) {
+    return
+  }
+  exchangeError.value = ''
+  showExchange.value = true
+}
+
+function closeExchange(): void {
+  showExchange.value = false
+  exchangeError.value = ''
+  exchangeBusy.value = false
+}
+
+async function onExchange(targetbid: number): Promise<void> {
+  const d = buildingDetail.value
+  if (!d || !activeCid.value) {
+    return
+  }
+  exchangeBusy.value = true
+  exchangeError.value = ''
+  try {
+    await city.exchangeBuilding(activeCid.value, d.bid, targetbid, BUILD_INNER, d.x, d.y)
+    closeExchange()
+  } catch (e) {
+    exchangeError.value = errorMessage(e)
+  } finally {
+    exchangeBusy.value = false
+  }
+}
+
 function closePanel(): void {
   selected.value = null
   buildingDetail.value = null
   panelError.value = ''
+  closeExchange()
 }
 
 // 心跳刷新建筑列表后，同步刷新已选建筑详情（用于展示升级完成后的等级）。
@@ -1341,6 +1491,7 @@ async function enterCity(cid: number): Promise<void> {
   loading.value = true
   error.value = ''
   closePanel()
+  closeBuild()
   closeTechnics()
   closeArmy()
   closeHeroes()
@@ -1365,6 +1516,7 @@ async function enterCity(cid: number): Promise<void> {
     }
     activeCid.value = target
     await city.loadCity(target)
+    await city.loadBuildingQueue(target)
     city.startHeartbeat(target)
     if (parseCid() !== target) {
       await router.replace({ name: 'city', params: { cid: String(target) } })
@@ -1440,11 +1592,13 @@ onBeforeUnmount(() => {
 
       <template v-if="!loading && !error">
         <ResourceBar :resource="city.resources" />
+        <BuildingQueueBar :items="city.buildingQueue" />
         <div class="city-body">
           <BuildingGrid
             :buildings="city.buildings"
             :selected="selected"
             @select="selectBuilding"
+            @select-empty="onSelectEmpty"
           />
           <BuildingPanel
             v-if="selected"
@@ -1454,11 +1608,35 @@ onBeforeUnmount(() => {
             :busy="busy"
             @upgrade="onUpgrade"
             @stop="onStop"
+            @destroy="onDestroy"
+            @destroy-all="onDestroyAll"
+            @cancel-destroy="onCancelDestroy"
+            @exchange="openExchange"
             @close="closePanel"
           />
         </div>
       </template>
     </main>
+
+    <BuildDialog
+      v-if="showBuild"
+      :candidates="buildCandidates"
+      :loading="buildLoading"
+      :error="buildError"
+      :busy="buildBusy"
+      @build="onBuild"
+      @close="closeBuild"
+    />
+
+    <BuildingExchangeDialog
+      v-if="showExchange && buildingDetail"
+      :bid="buildingDetail.bid"
+      :name="buildingDetail.name"
+      :busy="exchangeBusy"
+      :error="exchangeError"
+      @exchange="onExchange"
+      @close="closeExchange"
+    />
 
     <TechnicPanel
       v-if="showTechnics"
