@@ -79,3 +79,87 @@ button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
+/* ---- 原版按钮（三态贴图 button_{color}[_hl][_pr].png，原版按钮高 26px） ---- */
+
+.u-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: 26px;
+  padding: 0 12px;
+  color: #2b1d0c;
+  font-size: 13px;
+  border: none;
+  background: center / 100% 100% no-repeat;
+}
+.u-btn--gold { background-image: url('/images/button_gold.png'); }
+.u-btn--gold:hover:not(:disabled) { background-image: url('/images/button_gold_hl.png'); }
+.u-btn--gold:active:not(:disabled) { background-image: url('/images/button_gold_pr.png'); }
+.u-btn--green { background-image: url('/images/button_green.png'); }
+.u-btn--green:hover:not(:disabled) { background-image: url('/images/button_green_hl.png'); }
+.u-btn--green:active:not(:disabled) { background-image: url('/images/button_green_pr.png'); }
+.u-btn--red { color: #fff1e6; background-image: url('/images/button_red.png'); }
+.u-btn--red:hover:not(:disabled) { background-image: url('/images/button_red_hl.png'); }
+.u-btn--red:active:not(:disabled) { background-image: url('/images/button_red_pr.png'); }
+.u-btn--yellow { background-image: url('/images/button_yellow.png'); }
+.u-btn--yellow:hover:not(:disabled) { background-image: url('/images/button_yellow_hl.png'); }
+.u-btn--yellow:active:not(:disabled) { background-image: url('/images/button_yellow_pr.png'); }
+.u-btn--confirm { background-image: url('/images/button_confirm.png'); }
+.u-btn--confirm:hover:not(:disabled) { background-image: url('/images/button_confirm_hl.png'); }
+.u-btn--confirm:active:not(:disabled) { background-image: url('/images/button_confirm_pr.png'); }
+.u-btn--cancel { background-image: url('/images/button_cancel.png'); }
+.u-btn--cancel:hover:not(:disabled) { background-image: url('/images/button_cancel_hl.png'); }
+.u-btn--cancel:active:not(:disabled) { background-image: url('/images/button_cancel_pr.png'); }
+
+/* ---- 页签（原版 button_unselected/selected 贴图） ---- */
+
+.u-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.u-tab {
+  height: 26px;
+  padding: 0 12px;
+  color: var(--text-dim);
+  font-size: 13px;
+  border: none;
+  background: url('/images/button_unselected.png') center / 100% 100% no-repeat;
+}
+
+.u-tab.is-active {
+  color: var(--accent);
+  background-image: url('/images/button_selected.png');
+}
+
+/* ---- 通用内容排版 ---- */
+
+.u-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 13px;
+}
+
+.u-row > .label {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+}
+
+.u-hint {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.u-hint.is-error {
+  color: var(--danger);
+}
+
+.u-scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+}

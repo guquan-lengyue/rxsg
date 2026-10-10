@@ -52,6 +52,7 @@ func main() {
 		"migrations/0011_m7_battle.sql",
 		"migrations/0012_m8_task.sql",
 		"migrations/0013_m9_activity.sql",
+		"migrations/0014_m11_world.sql",
 		"migrations/0004_seed_normalized.sql",
 	}
 	for _, f := range files {
@@ -157,7 +158,10 @@ func report(db *sql.DB) error {
 		"cfg_task_groups", "cfg_tasks", "cfg_task_goals", "cfg_task_rewards", "user_tasks", "user_goals",
 		"cfg_achivement_groups", "cfg_achivements", "cfg_achivement_goals", "cfg_achivement_goal_mappings", "user_achivements",
 		"log_lottery", "mem_lottery_goods",
-		"cfg_pk_battle", "cfg_pk_level", "cfg_pk_hero", "cfg_pk_reward", "cfg_pk_first", "sys_pk_user"}
+		"cfg_pk_battle", "cfg_pk_level", "cfg_pk_hero", "cfg_pk_reward", "cfg_pk_first", "sys_pk_user",
+		"mem_world", "user_favourites", "user_inwars", "user_trickwars", "user_states",
+		"unions", "union_marks", "union_relations", "log_city_soldiers", "city_lamsters", "city_captives",
+		"cfg_nobility", "cfg_world_type", "cfg_office_pos", "cfg_name", "cfg_special_act"}
 	for _, t := range tables {
 		var n int64
 		if err := db.QueryRow("select count(*) from `" + t + "`").Scan(&n); err != nil {

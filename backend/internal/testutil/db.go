@@ -181,6 +181,15 @@ func (f *Fixture) Cleanup() {
 		{"delete from user_systask_num where user_id=?", true},
 		{"delete from user_schedule where user_id=?", true},
 		{"delete from user_buffers where user_id=?", true},
+		// M11 世界地图
+		{"delete from user_favourites where uid=?", true},
+		{"delete from user_inwars where uid=? or targetuid=?", true},
+		{"delete from union_marks where cid=?", false},
+		{"delete from user_states where uid=?", true},
+		{"delete from log_city_soldiers where cid=?", false},
+		{"delete from log_city_soldiers where uid=?", true},
+		{"delete from city_lamsters where city_id=?", false},
+		{"delete from city_captives where city_id=?", false},
 		// M9 单机活动（抽奖 / PK 征战）
 		{"delete from log_lottery where uid=?", true},
 		{"delete from mem_lottery_goods where uid=?", true},
@@ -210,6 +219,15 @@ func (f *Fixture) Cleanup() {
 	}
 	_, _ = d.Exec(ctx, "delete from city_trades where cid=? or buycid=?", f.CID, f.CID)
 	_, _ = d.Exec(ctx, "delete from tickets where user_id=? or binduid=?", f.UID, f.UID)
+	// M11：createCityFromLand 会新建城池（user_id=f.UID）与 mem_world 归属、君主将（city_id=0）→ 一并清理。
+	_, _ = d.Exec(ctx, "delete from mem_world where ownercid=?", f.CID)
+	_, _ = d.Exec(ctx, "delete from hero_blood where hero_id in (select id from heroes where user_id=?)", f.UID)
+	_, _ = d.Exec(ctx, "delete from city_schedule where city_id in (select id from cities where user_id=?)", f.UID)
+	_, _ = d.Exec(ctx, "delete from city_res_add where city_id in (select id from cities where user_id=?)", f.UID)
+	_, _ = d.Exec(ctx, "delete from city_resources where city_id in (select id from cities where user_id=?)", f.UID)
+	_, _ = d.Exec(ctx, "delete from buildings where city_id in (select id from cities where user_id=?)", f.UID)
+	_, _ = d.Exec(ctx, "delete from heroes where user_id=?", f.UID)
+	_, _ = d.Exec(ctx, "delete from cities where user_id=?", f.UID)
 	// M9：cfg_pk_first 为共享配置行（uid=0 表示空缺），测试占位后复位而非删除。
 	_, _ = d.Exec(ctx, "update cfg_pk_first set uid=0, passtime=0, time=0 where uid=?", f.UID)
 	_, _ = d.Exec(ctx, "delete from users where id=?", f.UID)

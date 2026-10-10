@@ -2,13 +2,16 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import * as cityApi from '@/api/city'
+import type { CityProduct, LevyResult, PacifyResult, ProductRatePayload } from '@/api/city'
 import type {
   ArmyInfo,
   Building,
   BuildingDetail,
   City,
   CityDetail,
+  CityDefence,
   CityResource,
+  CitySoldier,
   DispatchPayload,
   Field,
   HeroInfo,
@@ -32,6 +35,9 @@ export const useCityStore = defineStore('city', () => {
   const marches = ref<March[]>([])
   const heroInfo = ref<HeroInfo | null>(null)
   const hotelInfo = ref<HotelInfo | null>(null)
+  const product = ref<CityProduct | null>(null)
+  const troops = ref<CitySoldier[]>([])
+  const defences = ref<CityDefence[]>([])
 
   let timer: ReturnType<typeof setInterval> | null = null
 
@@ -52,6 +58,9 @@ export const useCityStore = defineStore('city', () => {
     marches.value = []
     heroInfo.value = null
     hotelInfo.value = null
+    product.value = null
+    troops.value = []
+    defences.value = []
     return d
   }
 
@@ -240,6 +249,52 @@ export const useCityStore = defineStore('city', () => {
     return hotelInfo.value
   }
 
+  // —— 内政：收税 / 征收 / 安抚 / 产出比例 ——
+
+  // 调税直接回写最新资源（后端返回整份 city_resources）。
+  async function setTax(cid: number, tax: number): Promise<CityResource> {
+    resources.value = await cityApi.setTax(cid, tax)
+    return resources.value
+  }
+
+  // 征收后民心-20：后端随响应回带最新资源，直接整份回写。
+  async function levy(cid: number, resid: number): Promise<LevyResult> {
+    const r = await cityApi.levyResource(cid, resid)
+    resources.value = r.resource
+    return r
+  }
+
+  // 安抚百姓：同上，随响应回写资源。
+  async function pacify(cid: number, action: number): Promise<PacifyResult> {
+    const r = await cityApi.pacifyPeople(cid, action)
+    resources.value = r.resource
+    return r
+  }
+
+  async function loadProduct(cid: number): Promise<CityProduct> {
+    product.value = await cityApi.getCityProduct(cid)
+    return product.value
+  }
+
+  // 提交产出比例后重新查询，回写最新四项比例。
+  async function setProductRate(cid: number, payload: ProductRatePayload): Promise<CityProduct> {
+    await cityApi.setCityProductRate(cid, payload)
+    product.value = await cityApi.getCityProduct(cid)
+    return product.value
+  }
+
+  // —— 外城：驻军 / 城防器械 ——
+
+  async function loadTroops(cid: number): Promise<CitySoldier[]> {
+    troops.value = await cityApi.getTroops(cid)
+    return troops.value
+  }
+
+  async function loadDefences(cid: number): Promise<CityDefence[]> {
+    defences.value = await cityApi.getDefences(cid)
+    return defences.value
+  }
+
   function startHeartbeat(cid: number): void {
     stopHeartbeat()
     timer = setInterval(() => {
@@ -285,6 +340,9 @@ export const useCityStore = defineStore('city', () => {
     marches,
     heroInfo,
     hotelInfo,
+    product,
+    troops,
+    defences,
     loadCities,
     loadCity,
     refreshResources,
@@ -314,6 +372,13 @@ export const useCityStore = defineStore('city', () => {
     loadHotelInfo,
     recruitHero,
     resetHotel,
+    setTax,
+    levy,
+    pacify,
+    loadProduct,
+    setProductRate,
+    loadTroops,
+    loadDefences,
     startHeartbeat,
     stopHeartbeat,
   }

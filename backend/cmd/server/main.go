@@ -25,6 +25,7 @@ import (
 	"rxsg/backend/internal/task"
 	"rxsg/backend/internal/tavern"
 	"rxsg/backend/internal/technic"
+	"rxsg/backend/internal/world"
 )
 
 func main() {
@@ -62,6 +63,7 @@ func main() {
 	achievementHandler := achievement.NewHandler(achievement.NewService(database))
 	lotteryHandler := lottery.NewHandler(lottery.NewService(database))
 	pkHandler := pk.NewHandler(pk.NewService(database))
+	worldHandler := world.NewHandler(world.NewService(database))
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -93,6 +95,7 @@ func main() {
 	achievementHandler.Register(protected)
 	lotteryHandler.Register(protected)
 	pkHandler.Register(protected)
+	worldHandler.Register(protected)
 
 	addr := ":" + strconv.Itoa(cfg.Server.Port)
 	log.Printf("rxsg backend 启动于 %s", addr)
