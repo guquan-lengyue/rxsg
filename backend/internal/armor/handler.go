@@ -33,6 +33,7 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	g.POST("/holes", h.initHoles)
 	g.POST("/open-hole", h.openHole)
 	g.POST("/embed", h.embed)
+	g.POST("/synth", h.synth)
 
 	// R11-3 新增（1:1 复刻 legacy BarnFunc.php 马厩/坐骑批次）：
 	g.POST("/barn/goods", h.barnGoods)                 // loadBarnGoods（BarnFunc.php:5）
@@ -306,6 +307,36 @@ func (h *Handler) combine(c *gin.Context) {
 		var err error
 		out, err = h.svc.CombineArmor(ctx, uid, req.MainSid, req.MainFlag, req.SubSid1, req.SubSid2, req.GoodsFlag)
 		return err
+	})
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// synthReq synthStuff(cid, targe_gid, count, dj, pearlProtect)。
+type synthReq struct {
+	CID          int `json:"cid"`
+	GID          int `json:"gid"`
+	Count        int `json:"count"`
+	DJ           int `json:"dj"`
+	PearlProtect int `json:"pearl_protect"`
+}
+
+// synth 宝石合成（EquipmentFunc.php:1156）。响应沿用 legacy ret 数组：[synth_count, need_gid, need_pear]。
+func (h *Handler) synth(c *gin.Context) {
+	var req synthReq
+	if err := c.ShouldBindJSON(&req); err != nil || req.CID <= 0 || req.GID <= 0 {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	uid := uidOf(c)
+	var out []any
+	err := h.svc.WithUserLock(c.Request.Context(), uid, "armor", func(ctx context.Context) error {
+		var e error
+		out, e = h.svc.Synth(ctx, uid, req.CID, req.GID, req.Count, req.DJ, req.PearlProtect)
+		return e
 	})
 	if err != nil {
 		httpx.WriteError(c, err)

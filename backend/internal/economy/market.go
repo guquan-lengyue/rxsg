@@ -278,14 +278,13 @@ func (s *Service) SellToMerchant(ctx context.Context, uid, cid int, food, wood, 
 	if food < 0 || wood < 0 || rock < 0 || iron < 0 || (food == 0 && wood == 0 && rock == 0 && iron == 0) || sellTimes < 1 {
 		return errLegacy("请输入正常的出售数量。")
 	}
-	money, err := s.cellInt(ctx, "select money from users where id=? limit 1", uid)
-	if err != nil {
+	// 原版分两次 sql_fetch_one_cell 读 money / gift；远端库单次往返较慢，
+	// 合并为一次 select 以减少往返（取值语义等价：无行时同为 0）。
+	userInfo, err := s.db.FetchOne(ctx, "select money, gift from users where id=?", uid)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	gift, err := s.cellInt(ctx, "select gift from users where id=? limit 1", uid)
-	if err != nil {
-		return err
-	}
+	money, gift := modelInt64(userInfo, "money"), modelInt64(userInfo, "gift")
 	need := 5 * sellTimes
 	// 原版顺序：元宝/礼金检查先于资源检查。
 	if paytype == 0 && money < need {
@@ -570,10 +569,10 @@ func (s *Service) GetUserBuyList(ctx context.Context, uid, cid int, page, filter
 				cid, unionid, filterResource2(filter), distExpr)
 		}
 		if strings.TrimSpace(sellName) != "" {
-			where = fmt.Sprintf("t.cid<>%d and t.state=0 and u.name=? and (t.unionid=0 or t.unionid=%d) %s and t.distance >= %s",
+			where = fmt.Sprintf("t.cid<>%d and t.state=0 and u.nickname=? and (t.unionid=0 or t.unionid=%d) %s and t.distance >= %s",
 				cid, unionid, filterResource2(filter), distExpr)
 		}
-		q := "select t.*, u.name as sellername from city_trades t " +
+		q := "select t.*, u.nickname as sellername from city_trades t " +
 			"left join cities c on c.id=t.cid left join users u on u.id=c.user_id " +
 			"where " + where + " order by " + distExpr + fmt.Sprintf(" limit %d,%d", pagestart, game.MarketListCPP)
 		var rows []map[string]any

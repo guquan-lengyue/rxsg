@@ -3,11 +3,13 @@ import { ref } from 'vue'
 
 import * as economyApi from '@/api/economy'
 import type {
+  ArmorAttr,
   AutoTransPayload,
   AutoTransRow,
   BuyListParams,
   BuyListResult,
   CopperGood,
+  HeroAttr,
   MarketInfo,
   MerchantInfo,
   MerchantTradePayload,
@@ -19,6 +21,8 @@ import type {
   ShopGood,
   StoreInfoResult,
   StoreRatePayload,
+  UseGoodsPayload,
+  UseGoodsResult,
   UserGood,
   WorkshopInfoResult,
 } from '@/api/economy'
@@ -140,6 +144,7 @@ export const useEconomyStore = defineStore('economy', () => {
   const market = ref<MarketInfo | null>(null)
   const merchant = ref<MerchantInfo | null>(null)
   const buyList = ref<BuyListResult | null>(null)
+  const buyListParams = ref<BuyListParams | null>(null)
   const sellData = ref<SellDataResult | null>(null)
   const autoTrans = ref<AutoTransRow[]>([])
   const autoTransHas = ref(false)
@@ -161,6 +166,7 @@ export const useEconomyStore = defineStore('economy', () => {
   }
 
   async function loadBuyList(cid: number, params: BuyListParams): Promise<BuyListResult> {
+    buyListParams.value = params
     buyList.value = await economyApi.getBuyList(cid, params)
     return buyList.value
   }
@@ -223,6 +229,10 @@ export const useEconomyStore = defineStore('economy', () => {
 
   async function cancelSell(cid: number, id: number): Promise<MarketInfo> {
     market.value = await economyApi.cancelSell(cid, id)
+    // 取消挂单后同步刷新玩家挂单列表（若已加载），避免列表残留已撤销的「挂单中」行。
+    if (buyListParams.value) {
+      buyList.value = await economyApi.getBuyList(cid, buyListParams.value)
+    }
     return market.value
   }
 
@@ -289,17 +299,25 @@ export const useEconomyStore = defineStore('economy', () => {
     await loadGoods()
   }
 
-  async function loadHeroAttr(hid: number): Promise<void> {
-    await economyApi.getHeroAttr(hid)
+  async function loadHeroAttr(hid: number): Promise<HeroAttr[]> {
+    return economyApi.getHeroAttr(hid)
   }
 
-  async function loadArmorAttr(aid: number): Promise<unknown[]> {
+  async function loadArmorAttr(aid: number): Promise<ArmorAttr[]> {
     return economyApi.getArmorAttr(aid)
   }
 
   async function sellGoods(p: SellGoodsPayload): Promise<void> {
     await economyApi.sellGoods(p)
     await loadGoods()
+  }
+
+  // 背包道具使用（POST /goods/use）；成功后刷新背包（材料/道具数变化），
+  // 城池资源与面板提示由父级负责。
+  async function useGoods(p: UseGoodsPayload): Promise<UseGoodsResult> {
+    const res = await economyApi.useGoods(p)
+    await loadGoods()
+    return res
   }
 
   // 背包道具 gid→名称（商城 cfg_shops 无名称时的回退解析）。
@@ -347,6 +365,7 @@ export const useEconomyStore = defineStore('economy', () => {
     loadHeroAttr,
     loadArmorAttr,
     sellGoods,
+    useGoods,
     goodName,
   }
 })

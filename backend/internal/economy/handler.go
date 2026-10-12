@@ -571,11 +571,12 @@ func (h *Handler) exchangeLiquan(c *gin.Context) {
 
 func (h *Handler) heroAttr(c *gin.Context) {
 	hid, _ := strconv.Atoi(c.Query("hid"))
-	if err := h.svc.GetGoodsHeroAttr(c.Request.Context(), hid); err != nil {
+	out, err := h.svc.GetGoodsHeroAttr(c.Request.Context(), hid)
+	if err != nil {
 		httpx.WriteError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"ok": true})
+	c.JSON(200, out)
 }
 
 func (h *Handler) armorAttr(c *gin.Context) {

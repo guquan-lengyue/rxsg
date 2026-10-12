@@ -151,6 +151,12 @@ const (
 	msgArmorChip          = "装备碎片"
 	msgChaijieEnd         = "。"
 	msgWrongPearlGID      = "宝珠gid错误"
+
+	// R4-A 宝石合成（EquipmentFunc.php:1156 synthStuff；lang.php 逐字）。
+	msgSynthCount        = "材料合成数量必须为正"  // lang.php:2168 equipment.synth_count
+	msgLinitLevel1       = "1级宝珠不能合成"    // lang.php:2169 equipment.linit_level1
+	msgSyncStaffLimitFmt = "需要合成技巧(%d级)" // lang.php:2184 equipment.sync_staff_limit_technic
+	msgNoStuff           = "你没有足够的合成材料"  // lang.php:2161 equipment.no_stuff
 )
 
 type Service struct {

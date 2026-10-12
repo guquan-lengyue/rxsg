@@ -25,22 +25,26 @@ import CivilPanel from '@/components/CivilPanel.vue'
 import OutCityPanel from '@/components/OutCityPanel.vue'
 import WorldMapPanel from '@/components/WorldMapPanel.vue'
 import { errorMessage } from '@/api/http'
-import type { StrongPayload } from '@/api/armor'
+import type { StrongPayload, SynthPayload } from '@/api/armor'
 import type { ProductRatePayload } from '@/api/city'
 import type { GovernPayload } from '@/api/world'
 import { cidToWid } from '@/render/worldGrid'
 import type {
+  ArmorAttr,
   AutoTransPayload,
   BuyListParams,
+  HeroAttr,
   MerchantTradePayload,
   PackItem,
   SellGoodsPayload,
   SellUserPayload,
   ShopBuyPayload,
   StoreRatePayload,
+  UseGoodsPayload,
+  UseGoodsResult,
 } from '@/api/economy'
 import type { AchievementFilter } from '@/api/achievement'
-import { zhCN } from '@/lang/zh-CN'
+import { legacyText, zhCN } from '@/lang/zh-CN'
 import { useArmorStore } from '@/stores/armor'
 import { useAuthStore } from '@/stores/auth'
 import { useCityStore } from '@/stores/city'
@@ -627,15 +631,19 @@ async function onBarnUpgrade(sid: number, isProtected: boolean): Promise<void> {
 const showArmor = ref(false)
 const armorLoading = ref(false)
 const armorError = ref('')
+const armorNotice = ref('')
 const armorBusy = ref(false)
 
 async function openArmor(): Promise<void> {
   showArmor.value = true
   armorError.value = ''
+  armorNotice.value = ''
   armorLoading.value = true
   try {
     await Promise.all([
       armor.loadBag(),
+      // 材料升级页签的目标宝石来自背包道具（GET /goods）。
+      economy.loadGoods(),
       city.heroInfo ? Promise.resolve() : activeCid.value ? city.loadHeroInfo(activeCid.value) : Promise.resolve(),
     ])
   } catch (e) {
@@ -648,6 +656,7 @@ async function openArmor(): Promise<void> {
 function closeArmor(): void {
   showArmor.value = false
   armorError.value = ''
+  armorNotice.value = ''
   armorBusy.value = false
 }
 
@@ -657,6 +666,7 @@ async function runArmor(fn: () => Promise<unknown>): Promise<void> {
   }
   armorBusy.value = true
   armorError.value = ''
+  armorNotice.value = ''
   try {
     await fn()
     // 修复/出售等扣城金，同步刷新资源
@@ -696,6 +706,25 @@ function onArmorStrong(p: StrongPayload): void {
   void runArmor(() => armor.strong(p))
 }
 
+// 材料升级（宝石合成）：结果文案 + 刷新背包道具/城池资源（不走 runArmor 以保留成功提示）。
+async function onArmorSynth(p: SynthPayload): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  armorBusy.value = true
+  armorError.value = ''
+  armorNotice.value = ''
+  try {
+    const res = await armor.synth(p)
+    armorNotice.value = `${zhCN.armor.synthSucc}${res[0] ?? 0}`
+    await Promise.all([economy.loadGoods(), city.refreshResources(activeCid.value)])
+  } catch (e) {
+    armorError.value = errorMessage(e)
+  } finally {
+    armorBusy.value = false
+  }
+}
+
 function onArmorCombine(mainSid: number, sub1: number, sub2: number, goodsFlag: number): void {
   void runArmor(() => armor.combine(mainSid, 1, sub1, sub2, goodsFlag))
 }
@@ -720,7 +749,14 @@ function onArmorLoadHero(hid: number): void {
 const showEconomy = ref(false)
 const economyLoading = ref(false)
 const economyError = ref('')
+const economyNotice = ref('')
 const economyBusy = ref(false)
+// 商城「属性提示」查得的结果（props 传入 MarketPanel 渲染）。
+const heroAttr = ref<HeroAttr | null>(null)
+const armorAttr = ref<ArmorAttr | null>(null)
+// 属性提示查不到时的内联提示（在「属性提示」区块内展示，不占面板顶部错误条）
+const heroAttrError = ref('')
+const armorAttrError = ref('')
 
 async function openEconomy(): Promise<void> {
   if (!activeCid.value) {
@@ -728,6 +764,7 @@ async function openEconomy(): Promise<void> {
   }
   showEconomy.value = true
   economyError.value = ''
+  economyNotice.value = ''
   economyLoading.value = true
   try {
     await Promise.all([
@@ -751,22 +788,38 @@ async function openEconomy(): Promise<void> {
 function closeEconomy(): void {
   showEconomy.value = false
   economyError.value = ''
+  economyNotice.value = ''
   economyBusy.value = false
+  heroAttr.value = null
+  armorAttr.value = null
+  heroAttrError.value = ''
+  armorAttrError.value = ''
 }
 
-async function runEconomy(fn: () => Promise<unknown>, refresh = false): Promise<void> {
+/** 经济面板切换页签时清除上一条提示（面板内 emit('clear-notice')）。 */
+function onEconomyClearNotice(): void {
+  economyError.value = ''
+  economyNotice.value = ''
+  heroAttrError.value = ''
+  armorAttrError.value = ''
+}
+
+async function runEconomy(fn: () => Promise<unknown>, refresh = false): Promise<boolean> {
   if (!activeCid.value) {
-    return
+    return false
   }
   economyBusy.value = true
   economyError.value = ''
+  economyNotice.value = ''
   try {
     await fn()
     if (refresh) {
       await city.refreshResources(activeCid.value)
     }
+    return true
   } catch (e) {
     economyError.value = errorMessage(e)
+    return false
   } finally {
     economyBusy.value = false
   }
@@ -817,11 +870,40 @@ function onEconomyCancelAutoTrans(id: number): void {
 }
 
 function onEconomyStoreRate(p: StoreRatePayload): void {
-  void runEconomy(() => economy.setStoreRate(activeCid.value, p))
+  void saveStoreRate(p)
 }
 
-function onEconomyStorePack(items: PackItem[]): void {
-  void runEconomy(() => economy.packStore(activeCid.value, items), true)
+// 存放比例：后端 ModifyStoreRate 的成功文案同样经 HTTP 400 message 返回（原版 throw）→
+// 按固定成功文案「修改仓库存放比例成功！」分流到成功提示；否则按错误展示。
+const STORE_RATE_OK = '修改仓库存放比例成功！'
+async function saveStoreRate(p: StoreRatePayload): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  economyBusy.value = true
+  economyError.value = ''
+  economyNotice.value = ''
+  try {
+    await economy.setStoreRate(activeCid.value, p)
+  } catch (e) {
+    const msg = errorMessage(e)
+    if (msg === STORE_RATE_OK) {
+      economyNotice.value = msg
+      await economy.loadStore(activeCid.value)
+    } else {
+      economyError.value = msg
+    }
+  } finally {
+    economyBusy.value = false
+  }
+}
+
+// 打包：后端成功返回 200（[0,0]），无成功文案 → 前端补原版提示「打包成功！」。
+async function onEconomyStorePack(items: PackItem[]): Promise<void> {
+  const ok = await runEconomy(() => economy.packStore(activeCid.value, items), true)
+  if (ok) {
+    economyNotice.value = zhCN.economy.packSuccess
+  }
 }
 
 function onEconomyWorkshopRefresh(isNeedWuzhu: number): void {
@@ -840,16 +922,70 @@ function onEconomyShopExchange(code: string): void {
   void runEconomy(() => economy.exchangeLiquan(code), true)
 }
 
-function onEconomyShopArmorAttr(aid: number): void {
-  void runEconomy(() => economy.loadArmorAttr(aid))
+// 属性提示：查不到属业务提示（如「没有属性提示」），在「属性提示」区块内联展示，
+// 不走 runEconomy（避免占用面板顶部错误条且不随输入区滚动）。
+async function onEconomyShopArmorAttr(aid: number): Promise<void> {
+  armorAttr.value = null
+  armorAttrError.value = ''
+  economyBusy.value = true
+  try {
+    const rows = await economy.loadArmorAttr(aid)
+    armorAttr.value = rows[0] ?? null
+  } catch (e) {
+    armorAttrError.value = errorMessage(e)
+  } finally {
+    economyBusy.value = false
+  }
 }
 
-function onEconomyShopHeroAttr(hid: number): void {
-  void runEconomy(() => economy.loadHeroAttr(hid))
+async function onEconomyShopHeroAttr(hid: number): Promise<void> {
+  heroAttr.value = null
+  heroAttrError.value = ''
+  economyBusy.value = true
+  try {
+    const rows = await economy.loadHeroAttr(hid)
+    heroAttr.value = rows[0] ?? null
+  } catch (e) {
+    heroAttrError.value = errorMessage(e)
+  } finally {
+    economyBusy.value = false
+  }
 }
 
 function onEconomySellGoods(p: SellGoodsPayload): void {
   void runEconomy(() => economy.sellGoods(p), true)
+}
+
+/** 使用道具结果文案：优先后端 message（遗留 key 经 legacyText 解析），mode=1 宝物列表无 message 时列举道具名。 */
+function useGoodsText(res: UseGoodsResult): string {
+  const parts: string[] = []
+  if (res.message) {
+    parts.push(legacyText(res.message))
+  }
+  if (res.goods?.length) {
+    parts.push(res.goods.map((g) => g.name ?? (g.gid ? `道具${g.gid}` : '')).filter(Boolean).join('、'))
+  }
+  return parts.filter(Boolean).join(' ') || '使用成功'
+}
+
+// 背包道具使用：不占用通用 runEconomy（需回填后端 message 到 notice）。
+async function onEconomyUseGoods(p: UseGoodsPayload): Promise<void> {
+  if (!activeCid.value) {
+    return
+  }
+  economyBusy.value = true
+  economyError.value = ''
+  economyNotice.value = ''
+  try {
+    const res = await economy.useGoods(p)
+    economyNotice.value = useGoodsText(res)
+    // 部分道具使用会改变城池资源（开资源箱/加 buff 等），统一刷新一次。
+    await city.refreshResources(activeCid.value)
+  } catch (e) {
+    economyError.value = errorMessage(e)
+  } finally {
+    economyBusy.value = false
+  }
 }
 
 // 战斗战报面板状态
@@ -1944,8 +2080,10 @@ onBeforeUnmount(() => {
       :hero-armors="armor.heroArmors"
       :cid="activeCid"
       :gold="city.resources?.gold ?? 0"
+      :goods="economy.goods"
       :loading="armorLoading"
       :error="armorError"
+      :notice="armorNotice"
       :busy="armorBusy"
       @equip="onArmorEquip"
       @offload="onArmorOffload"
@@ -1958,6 +2096,7 @@ onBeforeUnmount(() => {
       @init-holes="onArmorInitHoles"
       @open-hole="onArmorOpenHole"
       @embed="onArmorEmbed"
+      @synth="onArmorSynth"
       @load-hero="onArmorLoadHero"
       @close="closeArmor"
     />
@@ -1976,9 +2115,14 @@ onBeforeUnmount(() => {
       :workshop="economy.workshop"
       :shop="economy.shop"
       :goods="economy.goods"
+      :hero-attr="heroAttr"
+      :armor-attr="armorAttr"
+      :hero-attr-error="heroAttrError"
+      :armor-attr-error="armorAttrError"
       :gold="city.resources?.gold ?? 0"
       :loading="economyLoading"
       :error="economyError"
+      :notice="economyNotice"
       :busy="economyBusy"
       @load-merchant="onEconomyLoadMerchant"
       @buy-merchant="onEconomyBuyMerchant"
@@ -2000,6 +2144,8 @@ onBeforeUnmount(() => {
       @shop-armor-attr="onEconomyShopArmorAttr"
       @shop-hero-attr="onEconomyShopHeroAttr"
       @sell-goods="onEconomySellGoods"
+      @use-goods="onEconomyUseGoods"
+      @clear-notice="onEconomyClearNotice"
       @close="closeEconomy"
     />
 

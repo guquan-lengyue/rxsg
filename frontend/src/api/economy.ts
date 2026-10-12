@@ -103,10 +103,12 @@ export interface WorkshopGood {
 /** 作坊信息原始数组：[冷却剩余] 或 [冷却剩余, 数量, 货, 价格, 货, 价格, ...]。 */
 export type WorkshopInfoResult = unknown[]
 
-/** 商城商品（cfg_shops）。 */
+/** 商城商品（cfg_shops；name 由后端 left join cfg_goods 补出）。 */
 export interface ShopGood {
   id: number
   gid: number
+  /** 商品名（后端 `select s.*, g.name ...`；旧响应可能缺省） */
+  name?: string
   price: number
   pack: number
   group: number
@@ -136,6 +138,35 @@ export type ShopInfoResult = [
   CopperGood[],
 ]
 
+/** 武将属性提示行（GET /shop/hero-attr，select * from cfg_hero）。 */
+export interface HeroAttr {
+  id: number
+  name: string
+  npc_id: number
+  sex: number
+  face: number
+  level: number
+  command_base: number
+  affairs_base: number
+  bravery_base: number
+  wisdom_base: number
+  loyalty: number
+}
+
+/** 装备属性提示行（GET /shop/armor-attr，select * from cfg_armor）。 */
+export interface ArmorAttr {
+  id: number
+  name: string
+  part: number
+  type: number
+  hero_level: number
+  value: number
+  ori_hp_max: number
+  attribute: string
+  tieid: number
+  description: string
+}
+
 /** 用户背包道具（GET /goods，M2 已有，经济面板用于名称解析与出售宝物）。 */
 export interface UserGood {
   gid: number
@@ -148,6 +179,18 @@ export interface UserGood {
 
 /** 出售宝物结果（POST /goods/sell）：[道具行, cid, 城金]。 */
 export type SellGoodsResult = [UserGood, number, number]
+
+/** 使用道具结果（对齐后端 goods.UseResult）。mode: 0 消息框 / 1 宝物列表 / 2 有效期提示 / 3 开出装备 / 4 高级推恩 / 5 推恩 / 6 答题。 */
+export interface UseGoodsResult {
+  gid: number
+  mode: number
+  message?: string
+  endtime?: number
+  nobility?: number
+  left?: number
+  hid?: number
+  goods?: Array<{ gid?: number; name?: string }>
+}
 
 // —— 请求体 ——
 
@@ -195,6 +238,13 @@ export interface SellGoodsPayload {
   cid: number
   gid: number
   count: number
+}
+
+/** 使用道具请求体（POST /goods/use；hid 仅武魂段 110000<gid<160000 使用，否则传 0）。 */
+export interface UseGoodsPayload {
+  gid: number
+  hid: number
+  useCount: number
 }
 
 export interface StoreRatePayload {
@@ -353,13 +403,13 @@ export async function exchangeLiquan(code: string): Promise<unknown[]> {
   return data
 }
 
-export async function getHeroAttr(hid: number): Promise<{ ok: boolean }> {
-  const { data } = await http.get<{ ok: boolean }>('/shop/hero-attr', { params: { hid } })
+export async function getHeroAttr(hid: number): Promise<HeroAttr[]> {
+  const { data } = await http.get<HeroAttr[]>('/shop/hero-attr', { params: { hid } })
   return data
 }
 
-export async function getArmorAttr(aid: number): Promise<unknown[]> {
-  const { data } = await http.get<unknown[]>('/shop/armor-attr', { params: { aid } })
+export async function getArmorAttr(aid: number): Promise<ArmorAttr[]> {
+  const { data } = await http.get<ArmorAttr[]>('/shop/armor-attr', { params: { aid } })
   return data
 }
 
@@ -372,5 +422,11 @@ export async function sellGoods(p: SellGoodsPayload): Promise<SellGoodsResult> {
 
 export async function listUserGoods(): Promise<UserGood[]> {
   const { data } = await http.get<UserGood[]>('/goods')
+  return data
+}
+
+/** 使用背包道具（POST /goods/use）；可使用的道具范围以后端校验为准，前端不设白名单。 */
+export async function useGoods(p: UseGoodsPayload): Promise<UseGoodsResult> {
+  const { data } = await http.post<UseGoodsResult>('/goods/use', p)
   return data
 }

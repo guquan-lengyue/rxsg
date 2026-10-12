@@ -1,5 +1,6 @@
 import axios from 'axios'
 
+import { legacyText } from '@/lang/zh-CN'
 import type { APIError } from '@/types'
 
 export const TOKEN_KEY = 'rxsg_token'
@@ -34,10 +35,11 @@ http.interceptors.response.use(
 )
 
 // 从统一错误体 {"code","message"} 提取可展示文案。
+// 后端遗留消息可能是未翻译的 i18n key（如 not_enough_goods120）→ 经 legacyText 解析。
 export function errorMessage(error: unknown): string {
   const data = (error as { response?: { data?: APIError } })?.response?.data
   if (data?.message) {
-    return data.message
+    return legacyText(data.message)
   }
   if (error instanceof Error) {
     return error.message

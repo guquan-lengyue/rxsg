@@ -94,6 +94,24 @@ export async function strongArmor(p: StrongPayload): Promise<StrongResult> {
   return data
 }
 
+// —— 材料升级（宝石合成；对齐 legacy EquipmentFunc.php synthStuff(1156)）——
+// 入参 body：{cid, gid, count, dj, pearl_protect}；dj=1 用巧手符(gid202)，pearl_protect=1 用宝珠保护符(gid11172)。
+export interface SynthPayload {
+  cid: number
+  gid: number
+  count: number
+  dj: number
+  pearl_protect: number
+}
+
+/** synthStuff 回包（legacy ret）：[合成成功个数, 消耗材料 gid 串, 消耗材料个数]。 */
+export type SynthResult = [number, string, number]
+
+export async function synthArmor(p: SynthPayload): Promise<SynthResult> {
+  const { data } = await http.post<SynthResult>('/armors/synth', p)
+  return data
+}
+
 export async function combineArmor(
   mainSid: number,
   mainFlag: number,

@@ -8,7 +8,7 @@ package economy
 // 降级（新库缺表/外部服务）：
 //   - cfg_things 无 → getShopInfo 的五铢/积分"物品"列表恒空、parseAndAddReward type2 返回空行、
 //     isChiBiGoods 恒 false（cfg_things 联查）。
-//   - cfg_hero 无 → getGoodsHeroAttr 恒抛"没有属性提示"。
+//   - cfg_hero 由 0021_m13d_cfg_hero.sql 提供（名将卡商品 group 6/7 仍不存在）。
 //   - checkAndDoShopAct（M9 商城活动）→ 恒 false；addChibiGoods/addMenghuoGood → 走普通道具路径。
 //   - completeTask（M8）省略。
 // 原版怪癖保留：
@@ -40,12 +40,15 @@ func (s *Service) GetShopInfo(ctx context.Context, uid int) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	baseWhere := "onsale=1 and starttime<=unix_timestamp() and endtime>unix_timestamp() and `group` not in (6,7) and (gid<160001 or gid>160051)"
-	goods0, err := s.db.FetchRows(ctx, "SELECT * FROM cfg_shops WHERE "+baseWhere+" and (commend='0' or commend='2') ORDER BY position,id")
+	// 附带 name（cfg_goods.name）：legacy cfg_shop 行本身无名称，前端据此展示真实商品名。
+	// left join 不改变行集与排序（cfg_shops.gid → cfg_goods.gid 唯一）。
+	baseWhere := "s.onsale=1 and s.starttime<=unix_timestamp() and s.endtime>unix_timestamp() and s.`group` not in (6,7) and (s.gid<160001 or s.gid>160051)"
+	shopSelect := "select s.*, g.name as name from cfg_shops s left join cfg_goods g on g.gid=s.gid where " + baseWhere
+	goods0, err := s.db.FetchRows(ctx, shopSelect+" and (s.commend='0' or s.commend='2') ORDER BY s.position,s.id")
 	if err != nil {
 		return nil, err
 	}
-	goods1, err := s.db.FetchRows(ctx, "SELECT * FROM cfg_shops WHERE "+baseWhere+" and (commend='1' or commend='2') ORDER BY position,id")
+	goods1, err := s.db.FetchRows(ctx, shopSelect+" and (s.commend='1' or s.commend='2') ORDER BY s.position,s.id")
 	if err != nil {
 		return nil, err
 	}
@@ -72,9 +75,15 @@ func (s *Service) GetShopInfo(ctx context.Context, uid int) ([]any, error) {
 	return []any{wuzhu, point, goods0, goods1, wuzhuGoods, copperGoods}, nil
 }
 
-// GetGoodsHeroAttr 对齐 ShopFunc.php:25。cfg_hero 表缺失 → 恒抛"没有属性提示"。
-func (s *Service) GetGoodsHeroAttr(ctx context.Context, hid int) error {
-	return errLegacy("没有属性提示") // buyGoods.no_tip（原版 empty($hinfo) 分支）
+// GetGoodsHeroAttr 对齐 ShopFunc.php:25：命中 cfg_hero 返回 [该行]，空行 → "没有属性提示"。
+func (s *Service) GetGoodsHeroAttr(ctx context.Context, hid int) ([]any, error) {
+	info, err := s.db.FetchOne(ctx, "select * from cfg_hero where id=?", hid)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && len(info) == 0) {
+		return nil, errLegacy("没有属性提示")
+	} else if err != nil {
+		return nil, err
+	}
+	return []any{info}, nil
 }
 
 // GetGoodsArmorAttr 对齐 ShopFunc.php:36。
@@ -105,8 +114,9 @@ func (s *Service) BuyGoods(ctx context.Context, uid, id, cnt, paytype, gidArg in
 	var goods map[string]any
 	var err error
 	if gidArg != 0 {
-		// 原版怪癖：sql_fetch_one_cell("select * ...") 取首列 id。
-		idCell, e := s.cellInt(ctx, "select * from cfg_shops where gid=? and onsale=1", gidArg)
+		// 原版怪癖：sql_fetch_one_cell("select * ...") 取首行首列即 id（cfg_shops 首列为 id）。
+		// Go 单列 Scan 无法承载 select * 的 14 列 → 显式只取首列 id，保持"取首列"原意。
+		idCell, e := s.cellInt(ctx, "select id from cfg_shops where gid=? and onsale=1", gidArg)
 		if e != nil {
 			return nil, e
 		}

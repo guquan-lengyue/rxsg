@@ -193,6 +193,13 @@ export const zhCN = {
     pearlGid: '宝珠GID',
     noHoles: '未激活',
     sid: 'SID',
+    // 材料升级 / 宝石合成（铁匠铺页签 3；原版 BlackSmith_PeralUpgrade 等）
+    tabSynth: '材料升级', // BlackSmith_PeralUpgrade
+    pickGem: '没有选择要升级的材料', // BlackSmith_NoSynthStuff
+    synth: '合成', // BlackSmith_jinengshu1
+    synthSucc: '合成成功个数:', // BlackSmith_SynthSucc
+    useQiaoShou: '使用巧手符', // 巧手符 gid 202
+    usePearlProtect: '使用宝珠保护符', // 宝珠保护符 gid 11172
   },
   errors: {
     invalid_user_auth: '登录已失效，请重新登录',
@@ -202,6 +209,29 @@ export const zhCN = {
     internal_error: '服务器开小差了，请稍后再试',
     network: '网络异常，请稍后重试',
   },
+  // M6 经济：后端遗留 i18n key / 未 define 常量名字符串 → 中文。
+  // 原版文案优先；原版亦无中文者按原版通用句式补全（见各条注释）。
+  legacy: {
+    // 原版 MarketFunc::getMerchantInfo:118-125 的 MERCHANT_*_SELL_PRICE 常量全库未 define，
+    // 后端 1:1 返回常量名字符串（无实际价格数值）→ 按资源维度补可读中文。
+    MERCHANT_FOOD_SELL_PRICE: '粮食收购价',
+    MERCHANT_WOOD_SELL_PRICE: '木材收购价',
+    MERCHANT_ROCK_SELL_PRICE: '石料收购价',
+    MERCHANT_IRON_SELL_PRICE: '铁锭收购价',
+    // 自动运输缺「商队契约」(gid120)；原版原样抛该字面量、lang.php 无对应中文，
+    // 此处按原版「你没有足够的…」句式（如 not_enough_goods83）补全。
+    not_enough_goods120: '你没有足够的商队契约！',
+  } as Record<string, string>,
+  // M6 经济：面板成功/状态提示（对齐原版文案）。
+  economy: {
+    packSuccess: '打包成功！', // Store_StoreDialogSrc_1
+    autoTransNoContract: '你没有使用商队契约', // auto_trans.no_qiyue
+  },
 } as const
 
 export type Language = typeof zhCN
+
+/** 将后端遗留 i18n key / 常量名字符串解析为可读中文；未知原样返回。 */
+export function legacyText(raw: string): string {
+  return (zhCN.legacy as Record<string, string>)[raw] ?? raw
+}

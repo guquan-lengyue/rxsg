@@ -74,6 +74,11 @@ export const useArmorStore = defineStore('armor', () => {
     return res
   }
 
+  // 材料升级（宝石合成）：只消耗/产出道具，不影响装备背包；背包刷新由父级负责。
+  async function synth(p: armorApi.SynthPayload): Promise<armorApi.SynthResult> {
+    return armorApi.synthArmor(p)
+  }
+
   async function combine(mainSid: number, mainFlag: number, sub1: number, sub2: number, goodsFlag: number) {
     const res = await armorApi.combineArmor(mainSid, mainFlag, sub1, sub2, goodsFlag)
     await loadBag()
@@ -143,6 +148,7 @@ export const useArmorStore = defineStore('armor', () => {
     sell,
     chaijie,
     strong,
+    synth,
     combine,
     initHoles,
     openHole,

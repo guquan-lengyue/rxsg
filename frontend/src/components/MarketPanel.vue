@@ -4,13 +4,16 @@ import { computed, reactive, ref, watch } from 'vue'
 import SkinDialog from '@/components/SkinDialog.vue'
 import { formatLeft } from '@/render/cityGrid'
 import { img, resIcon } from '@/assets/img'
+import { legacyText, zhCN } from '@/lang/zh-CN'
 import type { CityResource } from '@/types'
 import type {
+  ArmorAttr,
   AutoTransPayload,
   AutoTransRow,
   BuyListParams,
   BuyListResult,
   CopperGood,
+  HeroAttr,
   MarketInfo,
   MerchantInfo,
   MerchantTradePayload,
@@ -21,6 +24,7 @@ import type {
   ShopBuyPayload,
   ShopGood,
   StoreRatePayload,
+  UseGoodsPayload,
   UserGood,
 } from '@/api/economy'
 import type { ShopView, StoreView, WorkshopView } from '@/stores/economy'
@@ -38,9 +42,16 @@ const props = defineProps<{
   workshop: WorkshopView | null
   shop: ShopView | null
   goods: UserGood[]
+  heroAttr: HeroAttr | null
+  armorAttr: ArmorAttr | null
+  /** 「查武将」失败/查不到时的内联提示（如「没有属性提示」），显示在属性提示区块内。 */
+  heroAttrError?: string
+  /** 「查装备」失败/查不到时的内联提示。 */
+  armorAttrError?: string
   gold: number
   loading: boolean
   error: string
+  notice: string
   busy: boolean
 }>()
 
@@ -65,12 +76,21 @@ const emit = defineEmits<{
   (e: 'shop-armor-attr', aid: number): void
   (e: 'shop-hero-attr', hid: number): void
   (e: 'sell-goods', p: SellGoodsPayload): void
+  (e: 'use-goods', p: UseGoodsPayload): void
+  (e: 'clear-notice'): void
   (e: 'close'): void
 }>()
 
 type Tab = 'market' | 'store' | 'workshop' | 'shop'
 const tab = ref<Tab>('market')
 const localError = ref('')
+
+/** 切页签时清掉本地与父级的提示，避免上一页签的错误/成功文案残留在顶部。 */
+function switchTab(key: Tab): void {
+  tab.value = key
+  localError.value = ''
+  emit('clear-notice')
+}
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'market', label: '市场' },
@@ -219,6 +239,7 @@ function addPackItem(): void {
     localError.value = '请填写打包数量与资源数量。'
     return
   }
+  localError.value = ''
   packItems.value = [...packItems.value, { ...packForm }]
   packForm.pack_count = 0
   packForm.res_count = 0
@@ -230,12 +251,25 @@ function removePackItem(index: number): void {
 }
 
 function submitPack(): void {
+  localError.value = ''
   if (!packItems.value.length) {
     localError.value = '请先添加打包项。'
     return
   }
   emit('store-pack', [...packItems.value])
 }
+
+// 打包成功后由父级回灌成功提示 → 清空已加入的待打包项与本地校验文案（原版
+// StoreDialog.onBuildingInfo param2==2 → afterPack + alert(打包成功！) 后关闭打包框）。
+watch(
+  () => props.notice,
+  (n) => {
+    if (n === zhCN.economy.packSuccess) {
+      packItems.value = []
+      localError.value = ''
+    }
+  },
+)
 
 // —— 作坊 ——
 const useWuzhu = ref(false)
@@ -250,6 +284,32 @@ const paytype = ref(0)
 const exchangeCode = ref('')
 const armorAid = ref(0)
 const heroHid = ref(0)
+
+/** 装备属性提示展示字段（对齐 cfg_armor 行；缺失/空值与无意义的 0 套装号不展示）。 */
+const armorAttrFields = computed<{ label: string; value: string }[]>(() => {
+  const a = props.armorAttr
+  if (!a) {
+    return []
+  }
+  const out: { label: string; value: string }[] = []
+  const push = (label: string, value: unknown): void => {
+    if (value === undefined || value === null || value === '') {
+      return
+    }
+    out.push({ label, value: String(value) })
+  }
+  push('部位', zhCN.armor.parts[a.part] ?? a.part)
+  push('品质', a.type)
+  push('需求等级', a.hero_level)
+  push('耐久上限', a.ori_hp_max)
+  push('出售价值', a.value)
+  push('属性', a.attribute)
+  if (a.tieid > 0) {
+    push('套装', a.tieid)
+  }
+  push('说明', a.description)
+  return out
+})
 
 function nameOfGid(gid: number): string {
   return props.goods.find((g) => g.gid === gid)?.name || `道具 ${gid}`
@@ -277,6 +337,20 @@ function submitSellGoods(): void {
   emit('sell-goods', { cid: props.cid, gid: sellGoodsForm.gid, count: sellGoodsForm.count })
 }
 
+// 背包道具「使用」（原版 Goods/MyGoodsDialog 右键使用；可使用的道具范围以后端校验为准）。
+// 原版为单次使用，后端 useGoods 支持连用次数，这里补数量输入。
+const useGoodsForm = reactive({ gid: 0, count: 1 })
+
+function submitUseGoods(): void {
+  localError.value = ''
+  if (!useGoodsForm.gid || useGoodsForm.count <= 0) {
+    localError.value = '请选择道具并填写数量。'
+    return
+  }
+  // hid 仅武魂段(110000<gid<160000)使用，背包直用无指定武将 → 0。
+  emit('use-goods', { gid: useGoodsForm.gid, hid: 0, useCount: useGoodsForm.count })
+}
+
 // 道具图标缺失回退文本。
 const failedIcons = ref<Set<number>>(new Set())
 function itemIcon(gid: number): string {
@@ -294,6 +368,11 @@ function iconOk(gid: number): boolean {
 function copperGoodName(g: CopperGood): string {
   return g.name || nameOfGid(g.gid)
 }
+
+/** 商城常规/推荐商品名：优先用后端 left join cfg_goods 返回的 name，缺省回退背包解析。 */
+function shopGoodName(g: ShopGood): string {
+  return g.name || nameOfGid(g.gid)
+}
 </script>
 
 <template>
@@ -305,7 +384,7 @@ function copperGoodName(g: CopperGood): string {
         class="u-tab"
         :class="{ 'is-active': tab === t.key }"
         type="button"
-        @click="tab = t.key"
+        @click="switchTab(t.key)"
       >
         {{ t.label }}
       </button>
@@ -314,6 +393,7 @@ function copperGoodName(g: CopperGood): string {
     <p v-if="loading" class="u-hint">加载中…</p>
     <p v-else-if="error" class="u-hint is-error">{{ error }}</p>
     <p v-if="localError" class="u-hint is-error">{{ localError }}</p>
+    <p v-if="notice" class="u-hint is-notice">{{ notice }}</p>
 
     <!-- 市场 -->
     <template v-if="tab === 'market'">
@@ -347,8 +427,8 @@ function copperGoodName(g: CopperGood): string {
         <div v-if="merchant" class="u-row">
           <span class="label">收购价</span>
           <span class="dim">
-            粮 {{ merchant.food_buy_price }} · 木 {{ merchant.wood_buy_price }} · 石
-            {{ merchant.rock_buy_price }} · 铁 {{ merchant.iron_buy_price }}
+            粮 {{ legacyText(merchant.food_buy_price) }} · 木 {{ legacyText(merchant.wood_buy_price) }} · 石
+            {{ legacyText(merchant.rock_buy_price) }} · 铁 {{ legacyText(merchant.iron_buy_price) }}
           </span>
         </div>
         <div v-if="sellData" class="u-row">
@@ -425,6 +505,8 @@ function copperGoodName(g: CopperGood): string {
               <button class="u-btn u-btn--cancel" type="button" :disabled="busy || t.state !== 0" @click="emit('cancel-sell', t.id)">
                 取消
               </button>
+              <!-- 加速仅对「进行中」交易可用（对齐原版 mark1/2：state1 售出在途 / state2 自动运输）；
+                   是否持有「木牛流马」(gid11) 由后端 accelerateSell 校验，前端不预判。 -->
               <button class="u-btn u-btn--yellow" type="button" :disabled="busy || (t.state !== 1 && t.state !== 2)" @click="emit('accelerate', t.id)">
                 加速
               </button>
@@ -469,7 +551,10 @@ function copperGoodName(g: CopperGood): string {
       </section>
 
       <section class="block">
-        <h4 class="block-title">自动运输 {{ autoTransHas ? '（已开通商队契约）' : '（未开通）' }}</h4>
+        <!-- 自动运输非功能门槛：原版无「未开通」标注；hasAutoTrans 仅表示是否持有商队契约 buff
+             （未持有时新增需消耗 1 个「商队契约」，文案取原版 auto_trans.no_qiyue）。 -->
+        <h4 class="block-title">自动运输</h4>
+        <p v-if="!autoTransHas" class="u-hint">{{ zhCN.economy.autoTransNoContract }}</p>
         <div class="u-row">
           <label class="field"><span>出发城</span>
             <input v-model.number="autoForm.fromcid" type="number" min="1" class="num" />
@@ -618,8 +703,8 @@ function copperGoodName(g: CopperGood): string {
           <ul v-if="shop.normal.length" class="list">
             <li v-for="g in shop.normal" :key="g.id" class="item">
               <div class="u-row">
-                <img v-if="iconOk(g.gid)" class="item-icon" :src="itemIcon(g.gid)" :alt="nameOfGid(g.gid)" @error="markIconFailed(g.gid)" />
-                <strong>{{ nameOfGid(g.gid) }}</strong>
+                <img v-if="iconOk(g.gid)" class="item-icon" :src="itemIcon(g.gid)" :alt="shopGoodName(g)" @error="markIconFailed(g.gid)" />
+                <strong>{{ shopGoodName(g) }}</strong>
                 <span class="dim">价 {{ g.price }} ×{{ g.pack }}</span>
                 <input v-model.number="buyCnt[g.id]" type="number" min="1" class="num" />
                 <button class="u-btn u-btn--green" type="button" :disabled="busy" @click="emitShopBuy(g, false)">购买</button>
@@ -635,8 +720,8 @@ function copperGoodName(g: CopperGood): string {
           <ul v-if="shop.recommend.length" class="list">
             <li v-for="g in shop.recommend" :key="g.id" class="item">
               <div class="u-row">
-                <img v-if="iconOk(g.gid)" class="item-icon" :src="itemIcon(g.gid)" :alt="nameOfGid(g.gid)" @error="markIconFailed(g.gid)" />
-                <strong>{{ nameOfGid(g.gid) }}</strong>
+                <img v-if="iconOk(g.gid)" class="item-icon" :src="itemIcon(g.gid)" :alt="shopGoodName(g)" @error="markIconFailed(g.gid)" />
+                <strong>{{ shopGoodName(g) }}</strong>
                 <span class="dim">价 {{ g.price }} ×{{ g.pack }}</span>
                 <input v-model.number="buyCnt[g.id]" type="number" min="1" class="num" />
                 <button class="u-btn u-btn--green" type="button" :disabled="busy" @click="emitShopBuy(g, false)">购买</button>
@@ -683,6 +768,16 @@ function copperGoodName(g: CopperGood): string {
             <label class="field"><span>武将 ID</span><input v-model.number="heroHid" type="number" min="0" class="num" /></label>
             <button class="u-btn u-btn--gold" type="button" :disabled="busy" @click="emit('shop-hero-attr', heroHid)">查武将</button>
           </div>
+          <p v-if="heroAttr" class="u-hint">
+            武将 {{ heroAttr.name }}｜等级 {{ heroAttr.level }}｜统率 {{ heroAttr.command_base }}｜内政
+            {{ heroAttr.affairs_base }}｜勇武 {{ heroAttr.bravery_base }}｜智谋 {{ heroAttr.wisdom_base }}｜忠诚
+            {{ heroAttr.loyalty }}
+          </p>
+          <p v-else-if="heroAttrError" class="u-hint is-error">{{ heroAttrError }}</p>
+          <p v-if="armorAttr" class="u-hint">
+            装备 {{ armorAttr.name }}<template v-for="f in armorAttrFields" :key="f.label">｜{{ f.label }} {{ f.value }}</template>
+          </p>
+          <p v-else-if="armorAttrError" class="u-hint is-error">{{ armorAttrError }}</p>
         </section>
 
         <section class="block">
@@ -698,6 +793,21 @@ function copperGoodName(g: CopperGood): string {
             <button class="u-btn u-btn--red" type="button" :disabled="busy" @click="submitSellGoods">出售</button>
           </div>
         </section>
+
+        <section class="block">
+          <!-- 原版在 Goods/MyGoodsDialog 背包右键「使用」；此处复用同一 GET /goods 数据源。 -->
+          <h4 class="block-title">使用道具</h4>
+          <div class="u-row">
+            <label class="field"><span>道具</span>
+              <select v-model.number="useGoodsForm.gid">
+                <option :value="0">请选择</option>
+                <option v-for="g in goods" :key="g.gid" :value="g.gid">{{ g.name }}（{{ g.count }}）</option>
+              </select>
+            </label>
+            <label class="field"><span>数量</span><input v-model.number="useGoodsForm.count" type="number" min="1" class="num" /></label>
+            <button class="u-btn u-btn--green" type="button" :disabled="busy" @click="submitUseGoods">使用</button>
+          </div>
+        </section>
       </template>
       <p v-else class="u-hint">暂无商城信息</p>
     </template>
@@ -709,6 +819,10 @@ function copperGoodName(g: CopperGood): string {
 </template>
 
 <style scoped>
+.u-hint.is-notice {
+  color: var(--accent);
+}
+
 .u-tabs {
   margin-bottom: 8px;
 }

@@ -754,8 +754,16 @@ func TestShopInfoAndBuy(t *testing.T) {
 		t.Fatalf("ret=%v want [1,0,898]", ret)
 	}
 
-	// 属性提示降级。
-	if err := s.GetGoodsHeroAttr(ctx, 1); errMsg(err) != "没有属性提示" {
+	// 属性提示：hid=1 命中 cfg_hero 返回赵云行；不存在 → 原文案。
+	hero, err := s.GetGoodsHeroAttr(ctx, 1)
+	if err != nil {
+		t.Fatalf("hero attr: %v", err)
+	}
+	heroRow, ok := hero[0].(map[string]any)
+	if !ok || fmt.Sprint(heroRow["name"]) != "赵云" {
+		t.Fatalf("hero=%v want [赵云行]", hero)
+	}
+	if _, err := s.GetGoodsHeroAttr(ctx, 999999); errMsg(err) != "没有属性提示" {
 		t.Fatalf("err=%q", errMsg(err))
 	}
 	if _, err := s.GetGoodsArmorAttr(ctx, 999999); errMsg(err) != "没有属性提示" {

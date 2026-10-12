@@ -2,9 +2,10 @@
 import { computed, reactive, ref } from 'vue'
 
 import { zhCN } from '@/lang/zh-CN'
-import { img } from '@/assets/img'
+import { img, itemIcon } from '@/assets/img'
+import type { UserGood } from '@/api/economy'
 import type { BagArmor, HeroArmorItem, HeroState } from '@/types'
-import type { StrongPayload } from '@/api/armor'
+import type { StrongPayload, SynthPayload } from '@/api/armor'
 
 const props = defineProps<{
   bag: BagArmor[]
@@ -12,8 +13,11 @@ const props = defineProps<{
   heroArmors: Record<number, HeroArmorItem[]>
   cid: number
   gold: number
+  /** 背包道具（材料升级页签的目标宝石来源；GET /goods）。 */
+  goods: UserGood[]
   loading: boolean
   error: string
+  notice: string
   busy: boolean
 }>()
 const emit = defineEmits<{
@@ -29,16 +33,18 @@ const emit = defineEmits<{
   (e: 'init-holes', sid: number): void
   (e: 'open-hole', sid: number, gid: number, pos: number, useType: number, count: number): void
   (e: 'embed', sid: number, pos: number, gid: number): void
+  (e: 'synth', p: SynthPayload): void
   (e: 'load-hero', hid: number): void
 }>()
 
-const tab = ref<'bag' | 'wear' | 'strong' | 'combine' | 'hole'>('bag')
+const tab = ref<'bag' | 'wear' | 'strong' | 'combine' | 'hole' | 'synth'>('bag')
 const tabs = [
   ['bag', zhCN.armor.tabBag],
   ['wear', zhCN.armor.tabWear],
   ['strong', zhCN.armor.tabStrong],
   ['combine', zhCN.armor.tabCombine],
   ['hole', zhCN.armor.tabHole],
+  ['synth', zhCN.armor.tabSynth],
 ] as const
 
 const selectedSid = ref(0)
@@ -156,6 +162,45 @@ function holeImage(i: number): string {
 function selectArmor(a: BagArmor): void {
   selectedSid.value = a.sid
 }
+
+// 材料升级 / 宝石合成（原版 BSCommandDialog.synthStuff；页签 3）
+// 目标宝石取背包中已有的宝珠/宝石（gid 区间对齐后端 armor/embed.go getDismantleCount：
+//   前 10 级镶嵌宝珠 300-379、聚魂珠 10830-10839、后 5 级 17500-17539）。
+function isGem(gid: number): boolean {
+  return (gid >= 300 && gid <= 379) || (gid >= 10830 && gid <= 10839) || (gid >= 17500 && gid <= 17539)
+}
+const gems = computed(() => props.goods.filter((g) => isGem(g.gid)))
+
+const synthForm = reactive<{ gid: number; count: number; dj: number; pearlProtect: number }>({
+  gid: 0,
+  count: 1,
+  dj: 0,
+  pearlProtect: 0,
+})
+
+function doSynth(): void {
+  if (synthForm.gid <= 0 || synthForm.count <= 0) {
+    return
+  }
+  emit('synth', {
+    cid: props.cid,
+    gid: synthForm.gid,
+    count: synthForm.count,
+    dj: synthForm.dj,
+    pearl_protect: synthForm.pearlProtect,
+  })
+}
+
+// 宝石图标缺失回退（item_{gid}.png）。
+const failedIcons = ref<Set<number>>(new Set())
+function markIconFailed(gid: number): void {
+  const next = new Set(failedIcons.value)
+  next.add(gid)
+  failedIcons.value = next
+}
+function iconOk(gid: number): boolean {
+  return !failedIcons.value.has(gid)
+}
 </script>
 
 <template>
@@ -181,6 +226,7 @@ function selectArmor(a: BagArmor): void {
 
       <p v-if="loading" class="hint">{{ zhCN.city.loading }}</p>
       <p v-else-if="error" class="hint error">{{ error }}</p>
+      <p v-if="notice" class="hint">{{ notice }}</p>
 
       <!-- 背包 -->
       <template v-if="tab === 'bag'">
@@ -335,7 +381,7 @@ function selectArmor(a: BagArmor): void {
       </template>
 
       <!-- 打孔 / 镶嵌 -->
-      <template v-else>
+      <template v-else-if="tab === 'hole'">
         <p v-if="!selected" class="hint">{{ zhCN.armor.pickArmor }}</p>
         <div v-else class="detail">
           <div class="row">
@@ -381,6 +427,40 @@ function selectArmor(a: BagArmor): void {
             <span class="dim small">{{ a.embed_holes || zhCN.armor.noHoles }}</span>
           </li>
         </ul>
+      </template>
+
+      <!-- 材料升级 / 宝石合成 -->
+      <template v-else>
+        <p v-if="!gems.length" class="hint">{{ zhCN.armor.pickGem }}</p>
+        <ul v-else class="list mini">
+          <li
+            v-for="g in gems"
+            :key="g.gid"
+            class="item row"
+            :class="{ sel: g.gid === synthForm.gid }"
+            @click="synthForm.gid = g.gid"
+          >
+            <img v-if="iconOk(g.gid)" class="gem-icon" :src="itemIcon(g.gid)" alt="" @error="markIconFailed(g.gid)" />
+            <span>{{ g.name || `${zhCN.armor.gid} ${g.gid}` }}</span>
+            <span class="dim small">×{{ g.count }}</span>
+          </li>
+        </ul>
+        <div v-if="synthForm.gid > 0" class="detail">
+          <div class="row">
+            <input v-model.number="synthForm.count" type="number" min="1" class="num" :placeholder="zhCN.armor.count" />
+            <label class="dim small">
+              <input v-model.number="synthForm.dj" type="checkbox" :true-value="1" :false-value="0" />
+              {{ zhCN.armor.useQiaoShou }}
+            </label>
+            <label class="dim small">
+              <input v-model.number="synthForm.pearlProtect" type="checkbox" :true-value="1" :false-value="0" />
+              {{ zhCN.armor.usePearlProtect }}
+            </label>
+            <button class="primary" :disabled="busy || synthForm.count <= 0" @click="doSynth">
+              {{ zhCN.armor.synth }}
+            </button>
+          </div>
+        </div>
       </template>
     </div>
   </div>
@@ -518,6 +598,15 @@ function selectArmor(a: BagArmor): void {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.gem-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: var(--bg);
 }
 
 select,

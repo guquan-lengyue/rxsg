@@ -60,6 +60,8 @@ func main() {
 		"migrations/0004_seed_normalized.sql",
 		"migrations/0019_demo_enemy_cities.sql",
 		"migrations/0020_m13c_barn.sql",
+		"migrations/0021_m13d_cfg_hero.sql",
+		"migrations/0022_m13e_cfg_recipe.sql",
 	}
 	for _, f := range files {
 		data, err := os.ReadFile(f)
@@ -157,6 +159,7 @@ func report(db *sql.DB) error {
 		"cfg_hero_expr_types", "hero_exprs", "hero_base_add", "log_money",
 		"recruit_heroes", "hero_blood", "cfg_names",
 		"cfg_armor", "user_armors", "hero_armors", "hero_attributes", "cfg_attribute",
+		"cfg_hero", "cfg_recipe",
 		"cfg_strong_probability", "cfg_xilian", "cfg_xilian_type", "cfg_armor_level_attr",
 		"cfg_armor_hole_rule", "cfg_tie", "cfg_tie_attribute", "user_tie_deify_attribute",
 		"things", "log_things", "log_armor_strong", "log_armor_combine", "log_selled_armor", "log_armor",
