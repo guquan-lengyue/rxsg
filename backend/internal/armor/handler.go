@@ -43,7 +43,117 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	g.GET("/barn/unactive-horse", h.barnUnactiveHorse) // loadUnActiveHorseArmor（EquipmentFunc.php:12）
 	g.POST("/upgrade", h.upgradeArmor)                 // doUpgradeArmor（ArmorFunc.php:1190）
 
+	// R11-4 新增（1:1 复刻 legacy 洗练 / 铁匠铺-技能书页签）：
+	g.POST("/xilian/goods", h.xilianGoods)             // loadXilianGoods（EquipmentFunc.php:1821）
+	g.POST("/xilian", h.xilian)                        // doXilian（EquipmentFunc.php:1841）
+	g.POST("/skillbook/open-tab", h.skillBookOpenTab)  // loadSkillBook_OpenTab（HeroSkillFunc.php:360）
+	g.POST("/skillbook/list", h.skillBookList)         // loadUserSkillBook（HeroSkillFunc.php:63）
+	g.GET("/skillbook/valid", h.skillBookValid)        // loadUserValidSkillBook（HeroSkillFunc.php:5）
+	g.POST("/skillbook/add-shelf", h.skillBookAddShelf) // AddSkillBookShelf（HeroSkillFunc.php:21）
+
 	rg.GET("/heroes/:hid/armors", h.heroArmors)
+}
+
+// ── R11-4 洗练端点（参数序对齐 legacy array_shift）────────────────────────────
+
+// xilianGoodsReq loadXilianGoods(xilianIndex)：0/1/2。
+type xilianGoodsReq struct {
+	XilianIndex int `json:"xilian_index"`
+}
+
+func (h *Handler) xilianGoods(c *gin.Context) {
+	var req xilianGoodsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	out, err := h.svc.LoadXilianGoods(c.Request.Context(), uidOf(c), req.XilianIndex)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// xilianReq doXilian(xilianIndex, gid, sid)。
+type xilianReq struct {
+	XilianIndex int `json:"xilian_index"`
+	GID         int `json:"gid"`
+	SID         int `json:"sid"`
+}
+
+func (h *Handler) xilian(c *gin.Context) {
+	var req xilianReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	uid := uidOf(c)
+	var out []any
+	err := h.svc.WithUserLock(c.Request.Context(), uid, "armor", func(ctx context.Context) error {
+		var e error
+		out, e = h.svc.DoXilian(ctx, uid, req.XilianIndex, req.GID, req.SID)
+		return e
+	})
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// ── R11-4 铁匠铺-技能书端点 ──────────────────────────────────────────────────
+
+func (h *Handler) skillBookOpenTab(c *gin.Context) {
+	out, err := h.svc.LoadSkillBookOpenTab(c.Request.Context(), uidOf(c))
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// skillBookListReq loadUserSkillBook(mBid)：mBid 为技能 id。
+type skillBookListReq struct {
+	Skill int `json:"skill"`
+}
+
+func (h *Handler) skillBookList(c *gin.Context) {
+	var req skillBookListReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.WriteError(c, httpx.BadRequest("invalid_param", "参数非法"))
+		return
+	}
+	out, err := h.svc.LoadUserSkillBook(c.Request.Context(), uidOf(c), req.Skill)
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+func (h *Handler) skillBookValid(c *gin.Context) {
+	out, err := h.svc.LoadUserValidSkillBook(c.Request.Context(), uidOf(c))
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+func (h *Handler) skillBookAddShelf(c *gin.Context) {
+	uid := uidOf(c)
+	var out []any
+	err := h.svc.WithUserLock(c.Request.Context(), uid, "armor", func(ctx context.Context) error {
+		var e error
+		out, e = h.svc.AddSkillBookShelf(ctx, uid)
+		return e
+	})
+	if err != nil {
+		httpx.WriteError(c, err)
+		return
+	}
+	c.JSON(200, out)
 }
 
 func uidOf(c *gin.Context) int { return c.GetInt(auth.CtxUID) }
